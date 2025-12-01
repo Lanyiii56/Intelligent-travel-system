@@ -13,6 +13,7 @@
 7. [解决冲突](#7-解决冲突)
 8. [Pull Request 流程](#8-pull-request-流程)
 9. [常用命令速查](#9-常用命令速查)
+10. [IDEA 图形化操作](#10-idea-图形化操作)
 
 ---
 
@@ -483,6 +484,181 @@ git stash
 git checkout 其他分支
 # 回来后恢复
 git stash pop
+```
+
+---
+
+## 10. IDEA 图形化操作
+
+> 使用 IntelliJ IDEA / WebStorm 进行 Git 操作，无需记忆命令行
+
+### 10.1 首次配置 IDEA
+
+#### 配置 Git 路径
+1. 打开 **Settings** (`Cmd + ,` 或 `Ctrl + Alt + S`)
+2. 搜索 **Git**
+3. 确认 Git 可执行文件路径正确（通常自动检测）
+4. 点击 **Test** 验证
+
+#### 配置 GitHub 账号
+1. **Settings** → **Version Control** → **GitHub**
+2. 点击 **+** 添加账号
+3. 选择 **Log In via GitHub** 或 **Log In with Token**
+4. 授权登录
+
+### 10.2 克隆项目
+
+1. 打开 IDEA，选择 **Get from VCS**
+2. URL 填入：`https://github.com/Lanyiii56/Intelligent-travel-system.git`
+3. 选择本地目录
+4. 点击 **Clone**
+
+### 10.3 拉取最新代码 (Pull)
+
+**方法1：工具栏**
+- 点击工具栏的 **蓝色向下箭头** ↓ 图标
+
+**方法2：菜单**
+- **Git** → **Pull**
+
+**方法3：快捷键**
+- macOS: `Cmd + T`
+- Windows: `Ctrl + T`
+
+### 10.4 创建分支
+
+1. 点击右下角的分支名（如 `main`）
+2. 选择 **New Branch**
+3. 输入分支名，如 `feature/login-page`
+4. 勾选 **Checkout branch**
+5. 点击 **Create**
+
+### 10.5 切换分支
+
+1. 点击右下角的分支名
+2. 在列表中选择目标分支
+3. 点击 **Checkout**
+
+### 10.6 提交代码 (Commit)
+
+**方法1：快捷键（推荐）**
+- macOS: `Cmd + K`
+- Windows: `Ctrl + K`
+
+**方法2：菜单**
+- **Git** → **Commit**
+
+**提交步骤：**
+1. 在左侧勾选要提交的文件
+2. 在下方输入提交信息（遵循规范，如 `feat: 添加登录功能`）
+3. 点击 **Commit** 仅提交到本地
+4. 或点击 **Commit and Push** 提交并推送
+
+### 10.7 推送代码 (Push)
+
+**方法1：快捷键**
+- macOS: `Cmd + Shift + K`
+- Windows: `Ctrl + Shift + K`
+
+**方法2：菜单**
+- **Git** → **Push**
+
+**方法3：工具栏**
+- 点击 **绿色向上箭头** ↑ 图标
+
+### 10.8 查看修改历史
+
+**查看文件历史：**
+1. 右键点击文件
+2. **Git** → **Show History**
+
+**查看项目历史：**
+1. 点击底部 **Git** 标签页
+2. 选择 **Log** 查看提交历史
+
+### 10.9 解决冲突
+
+当 Pull 或 Merge 出现冲突时：
+
+1. IDEA 会弹出冲突对话框
+2. 点击 **Merge** 打开三栏合并工具：
+   - 左侧：你的代码
+   - 中间：合并结果
+   - 右侧：远程代码
+3. 使用 `>>` 和 `<<` 按钮选择保留哪边的代码
+4. 或直接在中间编辑最终结果
+5. 点击 **Apply** 完成合并
+
+### 10.10 查看当前修改
+
+**方法1：快捷键**
+- macOS: `Cmd + 9`
+- Windows: `Alt + 9`
+
+**方法2：**
+- 点击底部 **Git** 标签页 → **Local Changes**
+
+### 10.11 撤销修改
+
+**撤销未提交的修改：**
+1. 右键点击文件
+2. **Git** → **Rollback**
+
+**撤销已提交但未推送：**
+1. 打开 **Git** → **Log**
+2. 右键点击要撤销的提交
+3. 选择 **Undo Commit**
+
+### 10.12 IDEA Git 操作速查表
+
+| 操作 | macOS 快捷键 | Windows 快捷键 | 菜单位置 |
+|------|-------------|----------------|----------|
+| 提交 | `Cmd + K` | `Ctrl + K` | Git → Commit |
+| 推送 | `Cmd + Shift + K` | `Ctrl + Shift + K` | Git → Push |
+| 拉取 | `Cmd + T` | `Ctrl + T` | Git → Pull |
+| 更新项目 | `Cmd + T` | `Ctrl + T` | Git → Update Project |
+| 查看历史 | - | - | Git → Show History |
+| 查看修改 | `Cmd + 9` | `Alt + 9` | View → Tool Windows → Git |
+| 撤销修改 | `Cmd + Z` | `Ctrl + Z` | Git → Rollback |
+
+### 10.13 IDEA 完整工作流程示例
+
+#### 场景：成员1 开发登录功能
+
+```
+1. 拉取最新代码
+   - 快捷键 Cmd+T (或点击 ↓ 图标)
+
+2. 创建功能分支
+   - 点击右下角 main → New Branch
+   - 输入 feature/login-page → Create
+
+3. 编写代码
+   - 修改 frontend/src/pages/Login.vue
+   - 修改 backend/.../auth/controller/AuthController.java
+
+4. 提交代码
+   - 快捷键 Cmd+K
+   - 勾选修改的文件
+   - 输入 "feat: 完成登录页面表单验证"
+   - 点击 Commit
+
+5. 继续开发...再次提交
+
+6. 推送到远程
+   - 快捷键 Cmd+Shift+K
+   - 点击 Push
+
+7. 在 GitHub 创建 Pull Request
+   - 打开 https://github.com/Lanyiii56/Intelligent-travel-system
+   - 点击 Compare & pull request
+   - 填写说明 → Create pull request
+
+8. 代码审查通过后合并
+
+9. 切换回 main 分支，拉取最新代码
+   - 点击右下角分支名 → main → Checkout
+   - Cmd+T 拉取
 ```
 
 ---
