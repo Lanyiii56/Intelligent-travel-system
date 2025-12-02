@@ -4,7 +4,7 @@
 export const AMAP_CONFIG = {
   // 高德地图 Web JS API Key
   // 申请地址: https://console.amap.com/dev/key/app
-  key: 'your-amap-key-here',
+  key: 'ab4ac19e5e7bbf52c5afc5cc0b68e796',
   
   // 安全密钥 (可选，用于更安全的调用)
   securityJsCode: '',

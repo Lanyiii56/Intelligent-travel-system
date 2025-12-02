@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/spots/**").permitAll()
                 .requestMatchers("/api/regions/**").permitAll()
                 .requestMatchers("/api/recommend/**").permitAll()
+                .requestMatchers("/api/foods/**").permitAll()
                 // 其他接口需要认证
                 .anyRequest().authenticated()
             )

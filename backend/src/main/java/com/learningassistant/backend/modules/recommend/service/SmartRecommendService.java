@@ -86,24 +86,165 @@ public class SmartRecommendService {
         return score;
     }
 
+    /**
+     * 智能路线规划
+     * 根据年龄、时长、距离等因素规划最优路线
+     */
     private List<SpotRecommend> planRoute(List<Spot> spots, RecommendRequest request) {
         List<SpotRecommend> result = new ArrayList<>();
         int remainingTime = request.getPlayTime();
+        int age = request.getAge();
         int order = 1;
 
-        for (Spot spot : spots) {
+        // 根据年龄调整游玩节奏
+        double paceMultiplier = calculatePaceMultiplier(age);
+        
+        // 按距离排序，优化路线（简单贪心算法）
+        List<Spot> sortedSpots = optimizeRouteOrder(spots);
+
+        for (Spot spot : sortedSpots) {
             if (spot.getPlayTime() == null) continue;
-            int travelTime = result.isEmpty() ? 0 : 30;
-            int totalNeeded = spot.getPlayTime() + travelTime;
+            
+            // 根据年龄调整实际游玩时间
+            int adjustedPlayTime = (int) (spot.getPlayTime() * paceMultiplier);
+            
+            // 计算到下一个景点的交通时间
+            int travelTime = result.isEmpty() ? 0 : calculateTravelTime(result.get(result.size() - 1), spot);
+            
+            // 根据年龄添加休息时间
+            int restTime = calculateRestTime(age, result.size());
+            
+            int totalNeeded = adjustedPlayTime + travelTime + restTime;
 
             if (remainingTime >= totalNeeded) {
                 SpotRecommend sr = convertToSpotRecommend(spot, order++);
-                sr.setReason(generateRecommendReason(spot, request.getAge()));
+                sr.setReason(generateRecommendReason(spot, age));
                 result.add(sr);
                 remainingTime -= totalNeeded;
             }
         }
+        
+        // 如果时间充裕，添加用餐建议
+        if (request.getPlayTime() >= 240 && result.size() >= 2) {
+            addMealSuggestion(result, request.getPlayTime());
+        }
+        
         return result;
+    }
+
+    /**
+     * 根据年龄计算游玩节奏系数
+     */
+    private double calculatePaceMultiplier(int age) {
+        if (age < 12) return 0.8;       // 儿童：节奏快，时间短
+        if (age < 25) return 0.9;       // 年轻人：精力充沛
+        if (age < 45) return 1.0;       // 中年人：正常节奏
+        if (age < 60) return 1.2;       // 中老年：稍慢
+        return 1.4;                      // 老年人：慢节奏
+    }
+
+    /**
+     * 计算休息时间（根据年龄和已游玩景点数）
+     */
+    private int calculateRestTime(int age, int visitedCount) {
+        if (visitedCount == 0) return 0;
+        
+        int baseRest = 10; // 基础休息时间
+        if (age < 12) return baseRest;
+        if (age < 45) return baseRest + 5;
+        if (age < 60) return baseRest + 15;
+        return baseRest + 25; // 老年人需要更多休息
+    }
+
+    /**
+     * 计算两个景点之间的交通时间（基于距离估算）
+     */
+    private int calculateTravelTime(SpotRecommend from, Spot to) {
+        if (from.getLatitude() == null || to.getLatitude() == null) {
+            return 30; // 默认30分钟
+        }
+        double distance = calculateDistance(
+            from.getLatitude(), from.getLongitude(),
+            to.getLatitude(), to.getLongitude()
+        );
+        // 假设平均速度30km/h（考虑城市交通）
+        return Math.max(15, (int) (distance / 30 * 60));
+    }
+
+    /**
+     * 计算两点之间的距离（公里）
+     */
+    private double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            return 5.0; // 默认5公里
+        }
+        double R = 6371; // 地球半径（公里）
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    /**
+     * 优化路线顺序（最近邻算法）
+     */
+    private List<Spot> optimizeRouteOrder(List<Spot> spots) {
+        if (spots.size() <= 2) return new ArrayList<>(spots);
+        
+        List<Spot> result = new ArrayList<>();
+        List<Spot> remaining = new ArrayList<>(spots);
+        
+        // 从第一个景点开始
+        result.add(remaining.remove(0));
+        
+        while (!remaining.isEmpty()) {
+            Spot last = result.get(result.size() - 1);
+            Spot nearest = findNearestSpot(last, remaining);
+            result.add(nearest);
+            remaining.remove(nearest);
+        }
+        
+        return result;
+    }
+
+    /**
+     * 找到最近的景点
+     */
+    private Spot findNearestSpot(Spot from, List<Spot> candidates) {
+        Spot nearest = candidates.get(0);
+        double minDistance = Double.MAX_VALUE;
+        
+        for (Spot spot : candidates) {
+            double distance = calculateDistance(
+                from.getLatitude(), from.getLongitude(),
+                spot.getLatitude(), spot.getLongitude()
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = spot;
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * 添加用餐建议
+     */
+    private void addMealSuggestion(List<SpotRecommend> spots, int totalTime) {
+        if (spots.isEmpty()) return;
+        
+        // 在中间位置添加用餐提示
+        int mealIndex = spots.size() / 2;
+        if (mealIndex < spots.size()) {
+            SpotRecommend spot = spots.get(mealIndex);
+            String currentReason = spot.getReason();
+            if (totalTime >= 360) { // 6小时以上建议午餐
+                spot.setReason(currentReason + " 【建议在此附近用午餐】");
+            }
+        }
     }
 
     private SpotRecommend convertToSpotRecommend(Spot spot, int order) {
@@ -134,6 +275,9 @@ public class SmartRecommendService {
         return reason.toString();
     }
 
+    /**
+     * 生成详细路线信息
+     */
     private RouteInfo generateRouteInfo(List<SpotRecommend> spots) {
         RouteInfo routeInfo = new RouteInfo();
         List<RoutePoint> points = new ArrayList<>();
@@ -148,20 +292,64 @@ public class SmartRecommendService {
             point.setLatitude(spot.getLatitude());
             point.setLongitude(spot.getLongitude());
             point.setOrder(i + 1);
-            point.setStayTime(spot.getPlayTime());
-            point.setTravelTime(i < spots.size() - 1 ? 30 : 0);
+            point.setStayTime(spot.getPlayTime() != null ? spot.getPlayTime() : 60);
+            
+            // 计算实际交通时间
+            int travelTime = 0;
+            if (i < spots.size() - 1) {
+                SpotRecommend nextSpot = spots.get(i + 1);
+                double distance = calculateDistance(
+                    spot.getLatitude(), spot.getLongitude(),
+                    nextSpot.getLatitude(), nextSpot.getLongitude()
+                );
+                travelTime = Math.max(15, (int) (distance / 30 * 60));
+                totalDistance += distance;
+            }
+            point.setTravelTime(travelTime);
 
-            if (i < spots.size() - 1) totalTime += 30;
-            totalTime += spot.getPlayTime();
-            if (i > 0) totalDistance += 5;
+            totalTime += point.getStayTime() + travelTime;
             points.add(point);
         }
 
         routeInfo.setPoints(points);
         routeInfo.setTotalTime(totalTime);
-        routeInfo.setTotalDistance(totalDistance);
-        routeInfo.setSuggestion(spots.size() <= 2 ? "行程轻松" : spots.size() <= 4 ? "行程适中" : "行程紧凑");
+        routeInfo.setTotalDistance(Math.round(totalDistance * 10) / 10.0);
+        routeInfo.setSuggestion(generateRouteSuggestion(spots.size(), totalTime, totalDistance));
         return routeInfo;
+    }
+
+    /**
+     * 生成路线建议
+     */
+    private String generateRouteSuggestion(int spotCount, int totalTime, double totalDistance) {
+        StringBuilder suggestion = new StringBuilder();
+        
+        // 行程强度评估
+        if (spotCount <= 2) {
+            suggestion.append("轻松休闲游，时间充裕可深度体验。");
+        } else if (spotCount <= 4) {
+            suggestion.append("行程适中，节奏舒适。");
+        } else {
+            suggestion.append("行程较紧凑，建议早出发。");
+        }
+        
+        // 交通建议
+        if (totalDistance > 20) {
+            suggestion.append("景点较分散，建议打车或自驾。");
+        } else if (totalDistance > 10) {
+            suggestion.append("可选择公交或打车出行。");
+        } else {
+            suggestion.append("景点较集中，可步行或骑行。");
+        }
+        
+        // 时间建议
+        if (totalTime > 480) {
+            suggestion.append("全天行程，请注意休息和用餐。");
+        } else if (totalTime > 240) {
+            suggestion.append("半天行程，可安排午餐后出发。");
+        }
+        
+        return suggestion.toString();
     }
 
     private CostEstimate calculateCost(List<SpotRecommend> spots, Integer peopleCount) {
