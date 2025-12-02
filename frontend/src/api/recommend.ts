@@ -74,6 +74,37 @@ export function recommend(userId: number, age: number, time: number) {
   return api.get<Spot[]>('/recommend', { params: { userId, age, time } });
 }
 
+// 获取推荐历史
 export function recommendHistory(userId: number) {
   return api.get('/recommend/history/' + userId);
+}
+
+// 获取热门景点
+export function getPopularSpots(limit: number = 10) {
+  return api.get<Spot[]>('/recommend/popular', { params: { limit } });
+}
+
+// 保存的行程
+export interface SavedItinerary {
+  id: number;
+  userId: number;
+  name: string;
+  itineraryData: string;
+  createTime: string;
+  updateTime: string;
+}
+
+// 保存行程
+export function saveItinerary(userId: number, name: string, itineraryData: string) {
+  return api.post('/recommend/itinerary/save', { userId, name, itineraryData });
+}
+
+// 获取用户保存的行程
+export function getUserItineraries(userId: number) {
+  return api.get<SavedItinerary[]>(`/recommend/itinerary/${userId}`);
+}
+
+// 删除行程
+export function deleteItinerary(id: number) {
+  return api.delete(`/recommend/itinerary/${id}`);
 }

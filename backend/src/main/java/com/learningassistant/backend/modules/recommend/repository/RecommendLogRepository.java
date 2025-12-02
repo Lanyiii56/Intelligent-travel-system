@@ -10,4 +10,6 @@ import java.util.List;
  */
 public interface RecommendLogRepository extends JpaRepository<RecommendLog, Long> {
     List<RecommendLog> findByUserId(Long userId);
+    
+    List<RecommendLog> findByUserIdOrderByCreateTimeDesc(Long userId);
 }

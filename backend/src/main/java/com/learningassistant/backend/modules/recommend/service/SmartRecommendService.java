@@ -3,11 +3,14 @@ package com.learningassistant.backend.modules.recommend.service;
 import com.learningassistant.backend.modules.recommend.dto.RecommendRequest;
 import com.learningassistant.backend.modules.recommend.dto.RecommendResponse;
 import com.learningassistant.backend.modules.recommend.dto.RecommendResponse.*;
+import com.learningassistant.backend.modules.recommend.model.SavedItinerary;
+import com.learningassistant.backend.modules.recommend.repository.SavedItineraryRepository;
 import com.learningassistant.backend.modules.spot.model.Spot;
 import com.learningassistant.backend.modules.spot.repository.SpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,6 +23,9 @@ public class SmartRecommendService {
 
     @Autowired
     private SpotRepository spotRepository;
+
+    @Autowired
+    private SavedItineraryRepository savedItineraryRepository;
 
     public RecommendResponse recommend(RecommendRequest request) {
         RecommendResponse response = new RecommendResponse();
@@ -45,7 +51,9 @@ public class SmartRecommendService {
         return allSpots.stream()
                 .filter(spot -> isAgeSuitable(spot, request.getAge()))
                 .filter(spot -> spot.getPlayTime() != null && spot.getPlayTime() <= request.getPlayTime())
-                .sorted(Comparator.comparing(this::calculateSpotScore).reversed())
+                .filter(spot -> isBudgetSuitable(spot, request.getBudget(), request.getPeopleCount()))
+                .filter(spot -> isPreferenceSuitable(spot, request.getPreference()))
+                .sorted(Comparator.comparing((Spot s) -> calculateSpotScore(s)).reversed())
                 .collect(Collectors.toList());
     }
 
@@ -54,10 +62,26 @@ public class SmartRecommendService {
         return age >= spot.getAgeMin() && age <= spot.getAgeMax();
     }
 
+    private boolean isBudgetSuitable(Spot spot, Double budget, Integer peopleCount) {
+        if (budget == null || budget <= 0) return true;
+        if (spot.getPriceMax() == null) return true;
+        double perPersonBudget = budget / peopleCount;
+        return spot.getPriceMax() <= perPersonBudget * 0.5;
+    }
+
+    private boolean isPreferenceSuitable(Spot spot, String preference) {
+        if (preference == null || preference.isEmpty()) return true;
+        if (spot.getDescription() == null) return true;
+        return spot.getDescription().contains(preference) || spot.getName().contains(preference);
+    }
+
     private double calculateSpotScore(Spot spot) {
-        double score = 0;
+        double score = 50;
         if (spot.getPriceMin() != null) {
-            score += 10 - (spot.getPriceMin() / 100);
+            score += Math.max(0, 20 - (spot.getPriceMin() / 50));
+        }
+        if (spot.getPlayTime() != null && spot.getPlayTime() <= 120) {
+            score += 10;
         }
         return score;
     }
@@ -160,5 +184,32 @@ public class SmartRecommendService {
         if (spots.isEmpty()) return "抱歉，根据您的条件暂未找到合适的景点";
         return String.format("为您推荐了%d个适合%d岁游客的景点，%d人总费用约¥%.0f",
                 spots.size(), request.getAge(), request.getPeopleCount(), cost.getTotalCost());
+    }
+
+    /**
+     * 保存行程
+     */
+    public SavedItinerary saveItinerary(Long userId, String name, String itineraryData) {
+        SavedItinerary itinerary = new SavedItinerary();
+        itinerary.setUserId(userId);
+        itinerary.setName(name);
+        itinerary.setItineraryData(itineraryData);
+        itinerary.setCreateTime(LocalDateTime.now());
+        itinerary.setUpdateTime(LocalDateTime.now());
+        return savedItineraryRepository.save(itinerary);
+    }
+
+    /**
+     * 获取用户保存的行程
+     */
+    public List<SavedItinerary> getUserItineraries(Long userId) {
+        return savedItineraryRepository.findByUserIdOrderByCreateTimeDesc(userId);
+    }
+
+    /**
+     * 删除行程
+     */
+    public void deleteItinerary(Long id) {
+        savedItineraryRepository.deleteById(id);
     }
 }

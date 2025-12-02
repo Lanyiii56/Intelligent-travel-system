@@ -102,13 +102,19 @@
     <!-- 推荐结果 -->
     <div v-if="result" class="result-section">
       <!-- 推荐总结 -->
-      <el-alert
-        :title="result.summary"
-        type="success"
-        :closable="false"
-        show-icon
-        class="summary-alert"
-      />
+      <div class="summary-row">
+        <el-alert
+          :title="result.summary"
+          type="success"
+          :closable="false"
+          show-icon
+          class="summary-alert"
+        />
+        <el-button type="warning" @click="onSaveItinerary" class="save-btn">
+          <el-icon><Star /></el-icon>
+          保存行程
+        </el-button>
+      </div>
 
       <el-row :gutter="24">
         <!-- 左侧：推荐景点列表 -->
@@ -262,9 +268,9 @@ import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import {
-  Location, MagicStick, Place, Timer, Wallet, Guide, Money, InfoFilled, MapLocation
+  Location, MagicStick, Place, Timer, Wallet, Guide, Money, InfoFilled, MapLocation, Star
 } from '@element-plus/icons-vue';
-import { smartRecommend, type SmartRecommendResponse } from '@/api/recommend';
+import { smartRecommend, saveItinerary, type SmartRecommendResponse } from '@/api/recommend';
 import { getAllRegions, type Region } from '@/api/region';
 import TravelMap from '@/components/TravelMap.vue';
 
@@ -337,6 +343,33 @@ function formatTime(minutes: number): string {
 function goToSpot(id: number) {
   router.push(`/spots/${id}`);
 }
+
+// 保存行程
+async function onSaveItinerary() {
+  if (!result.value || result.value.spots.length === 0) {
+    ElMessage.warning('没有可保存的行程');
+    return;
+  }
+
+  // 简单实现：使用固定userId=1，实际应从登录状态获取
+  const userId = 1;
+  const name = `${getRegionName(form.regionId)}${form.playTime >= 480 ? '一日游' : '半日游'}`;
+  const itineraryData = JSON.stringify(result.value);
+
+  try {
+    await saveItinerary(userId, name, itineraryData);
+    ElMessage.success('行程保存成功！');
+  } catch (e) {
+    console.error(e);
+    ElMessage.error('保存失败，请稍后重试');
+  }
+}
+
+function getRegionName(regionId: number | null): string {
+  if (!regionId) return '';
+  const region = regions.value.find(r => r.id === regionId);
+  return region ? region.name : '';
+}
 </script>
 
 <style scoped>
@@ -387,9 +420,20 @@ function goToSpot(id: number) {
   margin-top: 30px;
 }
 
-.summary-alert {
+.summary-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 24px;
+}
+
+.summary-alert {
+  flex: 1;
   border-radius: 12px;
+}
+
+.save-btn {
+  flex-shrink: 0;
 }
 
 .spots-card,
