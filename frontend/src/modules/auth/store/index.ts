@@ -60,6 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** 退出登录 */
   function logout() {
+    // 注意：用户相关的数据（如点赞状态）已按用户 ID 存储
+    // 不需要清除，切换账号后会自动加载对应用户的数据
     token.value = null;
     user.value = null;
     localStorage.removeItem(TOKEN_KEY);

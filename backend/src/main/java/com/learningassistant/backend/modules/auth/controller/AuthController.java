@@ -18,8 +18,15 @@ public class AuthController {
     private UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         try {
+            User user = new User();
+            user.setUsername(req.getUsername());
+            user.setPassword(req.getPassword());
+            user.setNickname(req.getNickname() != null ? req.getNickname() : req.getUsername());
+            user.setAge(req.getAge());
+            user.setGender(req.getGender());
+            
             User saved = userService.register(user);
             return ResponseEntity.ok(new RegisterResponse(saved.getId(), saved.getUsername(), saved.getNickname()));
         } catch (Exception e) {
@@ -75,6 +82,25 @@ public class AuthController {
         public String getAvatarUrl() { return avatarUrl; }
     }
 
+    public static class RegisterRequest {
+        private String username;
+        private String password;
+        private String nickname;
+        private Integer age;
+        private String gender;
+        
+        public String getUsername() { return username; }
+        public void setUsername(String username) { this.username = username; }
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+        public String getNickname() { return nickname; }
+        public void setNickname(String nickname) { this.nickname = nickname; }
+        public Integer getAge() { return age; }
+        public void setAge(Integer age) { this.age = age; }
+        public String getGender() { return gender; }
+        public void setGender(String gender) { this.gender = gender; }
+    }
+
     public static class RegisterResponse {
         private Long id;
         private String username;
@@ -87,5 +113,90 @@ public class AuthController {
         public Long getId() { return id; }
         public String getUsername() { return username; }
         public String getNickname() { return nickname; }
+    }
+    
+    // 更新用户资料
+    @PutMapping("/profile/{userId}")
+    public ResponseEntity<?> updateProfile(@PathVariable Long userId, @RequestBody UpdateProfileRequest req) {
+        try {
+            User updated = userService.updateProfile(userId, req.getNickname(), req.getAge(), req.getGender(), req.getMotto());
+            return ResponseEntity.ok(new UserInfo(updated.getId(), updated.getUsername(), updated.getNickname(), updated.getAvatarUrl()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    // 获取用户信息
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getUserInfo(@PathVariable Long userId) {
+        User user = userService.findById(userId);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(new UserDetailInfo(user));
+    }
+    
+    // 更新头像
+    @PutMapping("/avatar/{userId}")
+    public ResponseEntity<?> updateAvatar(@PathVariable Long userId, @RequestBody UpdateAvatarRequest req) {
+        try {
+            User updated = userService.updateAvatar(userId, req.getAvatarUrl());
+            return ResponseEntity.ok(new UserInfo(updated.getId(), updated.getUsername(), updated.getNickname(), updated.getAvatarUrl()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    // 更新资料请求 DTO
+    public static class UpdateProfileRequest {
+        private String nickname;
+        private Integer age;
+        private String gender;
+        private String motto;
+        
+        public String getNickname() { return nickname; }
+        public void setNickname(String nickname) { this.nickname = nickname; }
+        public Integer getAge() { return age; }
+        public void setAge(Integer age) { this.age = age; }
+        public String getGender() { return gender; }
+        public void setGender(String gender) { this.gender = gender; }
+        public String getMotto() { return motto; }
+        public void setMotto(String motto) { this.motto = motto; }
+    }
+    
+    // 更新头像请求 DTO
+    public static class UpdateAvatarRequest {
+        private String avatarUrl;
+        public String getAvatarUrl() { return avatarUrl; }
+        public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    }
+    
+    // 用户详细信息 DTO
+    public static class UserDetailInfo {
+        private Long id;
+        private String username;
+        private String nickname;
+        private String avatarUrl;
+        private Integer age;
+        private String gender;
+        private String createTime;
+        
+        public UserDetailInfo(User user) {
+            this.id = user.getId();
+            this.username = user.getUsername();
+            this.nickname = user.getNickname();
+            this.avatarUrl = user.getAvatarUrl();
+            this.age = user.getAge();
+            this.gender = user.getGender();
+            this.createTime = user.getCreateTime() != null ? user.getCreateTime().toString() : null;
+        }
+        
+        public Long getId() { return id; }
+        public String getUsername() { return username; }
+        public String getNickname() { return nickname; }
+        public String getAvatarUrl() { return avatarUrl; }
+        public Integer getAge() { return age; }
+        public String getGender() { return gender; }
+        public String getCreateTime() { return createTime; }
     }
 }

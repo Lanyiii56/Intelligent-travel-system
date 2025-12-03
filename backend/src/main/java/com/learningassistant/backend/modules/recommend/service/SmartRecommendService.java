@@ -5,7 +5,9 @@ import com.learningassistant.backend.modules.recommend.dto.RecommendResponse;
 import com.learningassistant.backend.modules.recommend.dto.RecommendResponse.*;
 import com.learningassistant.backend.modules.recommend.model.SavedItinerary;
 import com.learningassistant.backend.modules.recommend.repository.SavedItineraryRepository;
+import com.learningassistant.backend.modules.spot.model.Region;
 import com.learningassistant.backend.modules.spot.model.Spot;
+import com.learningassistant.backend.modules.spot.repository.RegionRepository;
 import com.learningassistant.backend.modules.spot.repository.SpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 /**
  * 智能推荐服务
  * 模块: recommend (成员3)
+ * 集成通义千问 AI 实现智能推荐
  */
 @Service
 public class SmartRecommendService {
@@ -27,11 +30,71 @@ public class SmartRecommendService {
     @Autowired
     private SavedItineraryRepository savedItineraryRepository;
 
+    @Autowired
+    private QwenAIService qwenAIService;
+    
+    @Autowired
+    private RegionRepository regionRepository;
+
+    // 存储 AI 返回的摘要和交通信息
+    private String lastAISummary = null;
+    private List<TransportInfo> lastTransportation = null;
+
     public RecommendResponse recommend(RecommendRequest request) {
         RecommendResponse response = new RecommendResponse();
 
-        List<Spot> suitableSpots = filterSpotsByConditions(request);
-        List<SpotRecommend> recommendedSpots = planRoute(suitableSpots, request);
+        // 获取符合条件的景点（放宽筛选条件，让 AI 有更多选择）
+        List<Spot> suitableSpots = filterSpotsByConditionsForAI(request);
+        
+        List<SpotRecommend> recommendedSpots;
+        lastAISummary = null;
+        lastTransportation = null;
+        
+        // 尝试使用 AI 推荐
+        if (qwenAIService.isAvailable() && suitableSpots.size() > 0) {
+            try {
+                System.out.println("正在调用通义千问 AI 进行智能推荐...");
+                recommendedSpots = getAIRecommendation(suitableSpots, request);
+                if (recommendedSpots != null && !recommendedSpots.isEmpty()) {
+                    // AI 推荐成功
+                    System.out.println("AI 推荐成功，返回 " + recommendedSpots.size() + " 个景点");
+                    response.setSpots(recommendedSpots);
+                    response.setAiPowered(true);
+                    
+                    RouteInfo routeInfo = generateRouteInfo(recommendedSpots);
+                    response.setRoute(routeInfo);
+                    
+                    CostEstimate costEstimate = calculateCost(recommendedSpots, request.getPeopleCount());
+                    // 如果有 AI 交通信息，更新交通费用
+                    if (lastTransportation != null && !lastTransportation.isEmpty()) {
+                        response.setTransportation(lastTransportation);
+                        double totalTransportCost = lastTransportation.stream()
+                            .mapToDouble(t -> t.getCost() != null ? t.getCost() : 0)
+                            .sum();
+                        costEstimate.setTransportCost(totalTransportCost * request.getPeopleCount());
+                        costEstimate.setTotalCost(costEstimate.getTicketCost() + costEstimate.getTransportCost() + costEstimate.getMealCost());
+                        costEstimate.setPerPersonCost(costEstimate.getTotalCost() / request.getPeopleCount());
+                    }
+                    response.setCost(costEstimate);
+                    
+                    // 使用 AI 生成的摘要
+                    if (lastAISummary != null && !lastAISummary.isEmpty()) {
+                        response.setSummary("🤖 AI智能推荐：" + lastAISummary);
+                    } else {
+                        response.setSummary("🤖 AI智能推荐：" + generateSummary(request, recommendedSpots, costEstimate));
+                    }
+                    return response;
+                }
+            } catch (Exception e) {
+                System.err.println("AI 推荐失败，使用默认算法: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        // 默认推荐逻辑
+        System.out.println("使用默认算法进行推荐...");
+        suitableSpots = filterSpotsByConditions(request);
+        recommendedSpots = planRoute(suitableSpots, request);
         response.setSpots(recommendedSpots);
 
         RouteInfo routeInfo = generateRouteInfo(recommendedSpots);
@@ -43,6 +106,162 @@ public class SmartRecommendService {
         response.setSummary(generateSummary(request, recommendedSpots, costEstimate));
 
         return response;
+    }
+    
+    /**
+     * 为 AI 推荐放宽筛选条件
+     */
+    private List<Spot> filterSpotsByConditionsForAI(RecommendRequest request) {
+        List<Spot> allSpots = spotRepository.findByRegionId(request.getRegionId());
+        
+        // 只做基本筛选，让 AI 有更多选择空间
+        return allSpots.stream()
+                .filter(spot -> spot.getPlayTime() != null && spot.getPlayTime() > 0)
+                .sorted(Comparator.comparing((Spot s) -> calculateSpotScore(s)).reversed())
+                .limit(10) // 最多给 AI 10 个景点选择
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 使用通义千问 AI 进行智能推荐
+     */
+    private List<SpotRecommend> getAIRecommendation(List<Spot> availableSpots, RecommendRequest request) {
+        // 构建景点信息列表（包含坐标用于路线规划）
+        List<Map<String, Object>> spotInfoList = new ArrayList<>();
+        for (Spot spot : availableSpots) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("id", spot.getId());
+            info.put("name", spot.getName());
+            info.put("description", spot.getDescription() != null ? spot.getDescription() : "暂无介绍");
+            info.put("playTime", spot.getPlayTime() != null ? spot.getPlayTime() : 60);
+            info.put("priceMin", spot.getPriceMin() != null ? spot.getPriceMin() : 0);
+            info.put("priceMax", spot.getPriceMax() != null ? spot.getPriceMax() : 0);
+            info.put("latitude", spot.getLatitude() != null ? spot.getLatitude() : 0);
+            info.put("longitude", spot.getLongitude() != null ? spot.getLongitude() : 0);
+            spotInfoList.add(info);
+        }
+        
+        // 获取目的地名称
+        String destination = "未知";
+        if (!availableSpots.isEmpty() && availableSpots.get(0).getRegionId() != null) {
+            Region region = regionRepository.findById(availableSpots.get(0).getRegionId()).orElse(null);
+            if (region != null) {
+                destination = region.getName();
+            }
+        }
+        
+        // 调用 AI
+        String aiResponse = qwenAIService.generateTravelRecommendation(
+            destination,
+            request.getAge(),
+            request.getPlayTime(),
+            request.getPeopleCount(),
+            request.getBudget(),
+            request.getPreference(),
+            spotInfoList
+        );
+        
+        if (aiResponse == null) {
+            return null;
+        }
+        
+        // 解析 AI 响应
+        Map<String, Object> parsed = qwenAIService.parseAIResponse(aiResponse);
+        if (parsed == null) {
+            return null;
+        }
+        
+        // 获取 AI 选择的景点序号
+        List<Integer> selectedIndices = (List<Integer>) parsed.get("selectedSpots");
+        Map<String, String> reasons = (Map<String, String>) parsed.get("reasons");
+        
+        // 保存 AI 生成的摘要
+        if (parsed.get("summary") != null) {
+            lastAISummary = parsed.get("summary").toString();
+        }
+        
+        // 解析交通信息（包含详细步骤）
+        if (parsed.get("transportation") != null) {
+            try {
+                List<Map<String, Object>> transportList = (List<Map<String, Object>>) parsed.get("transportation");
+                lastTransportation = new ArrayList<>();
+                for (Map<String, Object> t : transportList) {
+                    TransportInfo info = new TransportInfo();
+                    info.setFrom(t.get("from") != null ? t.get("from").toString() : "");
+                    info.setTo(t.get("to") != null ? t.get("to").toString() : "");
+                    info.setMethod(t.get("method") != null ? t.get("method").toString() : "步行");
+                    info.setDuration(t.get("duration") != null ? ((Number) t.get("duration")).intValue() : 10);
+                    info.setDistance(t.get("distance") != null ? ((Number) t.get("distance")).doubleValue() : 1.0);
+                    info.setCost(t.get("cost") != null ? ((Number) t.get("cost")).doubleValue() : 0.0);
+                    info.setTips(t.get("tips") != null ? t.get("tips").toString() : "");
+                    
+                    // 解析详细步骤
+                    if (t.get("steps") != null) {
+                        List<Map<String, Object>> stepsList = (List<Map<String, Object>>) t.get("steps");
+                        List<TransportStep> steps = new ArrayList<>();
+                        for (Map<String, Object> s : stepsList) {
+                            TransportStep step = new TransportStep();
+                            step.setType(s.get("type") != null ? s.get("type").toString() : "步行");
+                            step.setInstruction(s.get("instruction") != null ? s.get("instruction").toString() : "");
+                            step.setLine(s.get("line") != null ? s.get("line").toString() : "");
+                            step.setStations(s.get("stations") != null ? ((Number) s.get("stations")).intValue() : 0);
+                            step.setStartStation(s.get("startStation") != null ? s.get("startStation").toString() : "");
+                            step.setEndStation(s.get("endStation") != null ? s.get("endStation").toString() : "");
+                            step.setDuration(s.get("duration") != null ? ((Number) s.get("duration")).intValue() : 0);
+                            steps.add(step);
+                        }
+                        info.setSteps(steps);
+                    }
+                    
+                    lastTransportation.add(info);
+                }
+                System.out.println("AI 返回 " + lastTransportation.size() + " 条交通信息");
+            } catch (Exception e) {
+                System.err.println("解析交通信息失败: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
+        if (selectedIndices == null || selectedIndices.isEmpty()) {
+            return null;
+        }
+        
+        // 构建推荐结果
+        List<SpotRecommend> result = new ArrayList<>();
+        int order = 1;
+        int totalTime = 0;
+        
+        for (Integer index : selectedIndices) {
+            if (index < 1 || index > availableSpots.size()) continue;
+            
+            Spot spot = availableSpots.get(index - 1);
+            
+            // 检查时间限制
+            if (totalTime + spot.getPlayTime() > request.getPlayTime()) {
+                break;
+            }
+            
+            SpotRecommend recommend = new SpotRecommend();
+            recommend.setId(spot.getId());
+            recommend.setName(spot.getName());
+            recommend.setDescription(spot.getDescription());
+            recommend.setImageUrl(spot.getImageUrl());
+            recommend.setPlayTime(spot.getPlayTime());
+            recommend.setPriceMin(spot.getPriceMin() != null ? spot.getPriceMin() : 0);
+            recommend.setPriceMax(spot.getPriceMax() != null ? spot.getPriceMax() : 0);
+            recommend.setLatitude(spot.getLatitude());
+            recommend.setLongitude(spot.getLongitude());
+            recommend.setOrder(order++);
+            
+            // 设置 AI 生成的推荐理由
+            String reason = reasons != null ? reasons.get(spot.getName()) : null;
+            recommend.setReason(reason != null ? reason : generateDefaultReason(spot, request.getAge()));
+            
+            result.add(recommend);
+            totalTime += spot.getPlayTime();
+        }
+        
+        return result.isEmpty() ? null : result;
     }
 
     private List<Spot> filterSpotsByConditions(RecommendRequest request) {
@@ -84,6 +303,37 @@ public class SmartRecommendService {
             score += 10;
         }
         return score;
+    }
+    
+    /**
+     * 生成默认推荐理由
+     */
+    private String generateDefaultReason(Spot spot, Integer age) {
+        StringBuilder reason = new StringBuilder();
+        
+        if (age != null) {
+            if (age < 18) {
+                reason.append("适合青少年游玩，");
+            } else if (age < 35) {
+                reason.append("适合年轻人探索，");
+            } else if (age < 55) {
+                reason.append("适合中年人休闲，");
+            } else {
+                reason.append("适合老年人放松，");
+            }
+        }
+        
+        if (spot.getPlayTime() != null) {
+            if (spot.getPlayTime() <= 60) {
+                reason.append("游玩时间短，轻松愉快");
+            } else if (spot.getPlayTime() <= 120) {
+                reason.append("游玩时间适中，体验丰富");
+            } else {
+                reason.append("可深度游玩，值得细细品味");
+            }
+        }
+        
+        return reason.length() > 0 ? reason.toString() : "值得一游的好去处";
     }
 
     /**

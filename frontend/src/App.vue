@@ -1,5 +1,23 @@
 <template>
   <div id="app">
+    <!-- 全局装饰元素 -->
+    <div class="global-decorations">
+      <span class="g-deco g-deco-1">✈️</span>
+      <span class="g-deco g-deco-2">🏝️</span>
+      <span class="g-deco g-deco-3">🎒</span>
+      <span class="g-deco g-deco-4">🗺️</span>
+      <span class="g-deco g-deco-5">⛰️</span>
+      <span class="g-deco g-deco-6">🌴</span>
+      <span class="g-deco g-deco-7">🚂</span>
+      <span class="g-deco g-deco-8">🏰</span>
+      <span class="g-deco g-deco-9">🎡</span>
+      <span class="g-deco g-deco-10">🌊</span>
+      <div class="g-circle g-circle-1"></div>
+      <div class="g-circle g-circle-2"></div>
+      <div class="g-circle g-circle-3"></div>
+      <div class="g-circle g-circle-4"></div>
+    </div>
+    
     <header class="header">
       <div class="header-content">
         <div class="logo">
@@ -15,7 +33,7 @@
             <span class="nav-icon">🏞️</span>
             <span>景点</span>
           </router-link>
-          <router-link to="/recommend" class="nav-link">
+          <router-link to="/smart-recommend" class="nav-link">
             <span class="nav-icon">✨</span>
             <span>推荐</span>
           </router-link>
@@ -25,13 +43,17 @@
           </router-link>
         </nav>
         <div class="header-actions">
-          <router-link to="/login" class="login-btn" v-if="!isLoggedIn">登录</router-link>
+          <router-link to="/login" class="login-btn" v-if="!authStore.isLoggedIn">登录</router-link>
           <button v-else class="logout-btn" @click="handleLogout">退出</button>
         </div>
       </div>
     </header>
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <keep-alive :include="['SmartRecommend', 'Profile']">
+          <component :is="Component" :key="route.path" />
+        </keep-alive>
+      </router-view>
     </main>
     <footer class="footer">
       <!-- 页脚链接区 -->
@@ -91,13 +113,12 @@
 </template>
 
 <script setup lang="ts">
-import { useAuth } from '@/composables/useAuth';
-import { computed } from 'vue';
+import { useAuthStore } from '@/modules/auth/store';
 
-const { isLoggedIn, logout } = useAuth();
+const authStore = useAuthStore();
 
 function handleLogout() {
-  logout();
+  authStore.logout();
 }
 </script>
 
@@ -108,6 +129,86 @@ function handleLogout() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 全局装饰元素 */
+.global-decorations {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.g-deco {
+  position: absolute;
+  font-size: 28px;
+  opacity: 0.25;
+  animation: g-float 8s ease-in-out infinite;
+}
+
+.g-deco-1 { top: 15%; left: 3%; animation-delay: 0s; font-size: 36px; }
+.g-deco-2 { top: 35%; left: 5%; animation-delay: 1.2s; font-size: 30px; }
+.g-deco-3 { top: 55%; left: 2%; animation-delay: 2.4s; font-size: 24px; }
+.g-deco-4 { top: 75%; left: 4%; animation-delay: 0.6s; font-size: 32px; }
+.g-deco-5 { top: 20%; right: 3%; animation-delay: 1.8s; font-size: 34px; }
+.g-deco-6 { top: 40%; right: 5%; animation-delay: 3s; font-size: 28px; }
+.g-deco-7 { top: 60%; right: 2%; animation-delay: 0.9s; font-size: 26px; }
+.g-deco-8 { top: 80%; right: 4%; animation-delay: 2.1s; font-size: 30px; }
+.g-deco-9 { top: 10%; left: 50%; animation-delay: 1.5s; font-size: 22px; }
+.g-deco-10 { bottom: 10%; left: 50%; animation-delay: 2.7s; font-size: 24px; }
+
+.g-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  animation: g-pulse 6s ease-in-out infinite;
+}
+
+.g-circle-1 {
+  width: 300px;
+  height: 300px;
+  top: 10%;
+  left: -100px;
+}
+
+.g-circle-2 {
+  width: 200px;
+  height: 200px;
+  top: 50%;
+  right: -50px;
+  animation-delay: 1.5s;
+}
+
+.g-circle-3 {
+  width: 150px;
+  height: 150px;
+  bottom: 20%;
+  left: 5%;
+  animation-delay: 3s;
+}
+
+.g-circle-4 {
+  width: 250px;
+  height: 250px;
+  bottom: 5%;
+  right: 10%;
+  animation-delay: 4.5s;
+}
+
+@keyframes g-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(3deg); }
+}
+
+@keyframes g-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.15; }
+  50% { transform: scale(1.08); opacity: 0.25; }
 }
 
 .header {
@@ -216,16 +317,21 @@ function handleLogout() {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .footer {
-  background: #f5f5f5;
-  border-top: 1px solid #e8e8e8;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   padding: 24px 20px;
   text-align: center;
-  color: #999;
+  color: #666;
   font-size: 12px;
   margin-top: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .footer-links {

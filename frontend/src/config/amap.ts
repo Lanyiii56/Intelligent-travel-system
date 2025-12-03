@@ -12,16 +12,17 @@ export const AMAP_CONFIG = {
   // API 版本
   version: '2.0',
   
-  // 需要加载的插件
+  // 需要加载的插件（仅使用免费功能）
   plugins: [
-    'AMap.Driving',      // 驾车路线规划
-    'AMap.Walking',      // 步行路线规划
-    'AMap.Transfer',     // 公交路线规划
-    'AMap.Marker',       // 标记点
-    'AMap.Polyline',     // 折线
-    'AMap.InfoWindow',   // 信息窗口
-    'AMap.Geocoder',     // 地理编码
-    'AMap.PlaceSearch',  // 地点搜索
+    'AMap.Marker',       // 标记点（免费）
+    'AMap.Polyline',     // 折线（免费）
+    'AMap.InfoWindow',   // 信息窗口（免费）
+    // 以下插件需要企业认证或付费，已禁用：
+    // 'AMap.Driving',      // 驾车路线规划（需付费）
+    // 'AMap.Walking',      // 步行路线规划（需付费）
+    // 'AMap.Transfer',     // 公交路线规划（需付费）
+    // 'AMap.Geocoder',     // 地理编码（有配额限制）
+    // 'AMap.PlaceSearch',  // 地点搜索（有配额限制）
   ]
 };
 

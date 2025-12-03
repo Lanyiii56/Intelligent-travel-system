@@ -10,4 +10,10 @@ import java.util.List;
  */
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findBySpotId(Long spotId);
+    
+    // 获取顶级评论（按时间倒序）
+    List<Comment> findBySpotIdAndParentIdIsNullOrderByCreatedAtDesc(Long spotId);
+    
+    // 获取某评论的回复（按时间正序）
+    List<Comment> findByParentIdOrderByCreatedAtAsc(Long parentId);
 }

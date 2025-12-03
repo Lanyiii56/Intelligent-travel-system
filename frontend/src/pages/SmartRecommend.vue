@@ -1,5 +1,20 @@
 <template>
   <div class="smart-recommend-page">
+    <!-- 装饰元素 -->
+    <div class="decorations">
+      <span class="deco deco-1">✈️</span>
+      <span class="deco deco-2">🏝️</span>
+      <span class="deco deco-3">🎒</span>
+      <span class="deco deco-4">🗺️</span>
+      <span class="deco deco-5">⛰️</span>
+      <span class="deco deco-6">🌴</span>
+      <span class="deco deco-7">🚂</span>
+      <span class="deco deco-8">🏰</span>
+      <div class="deco-circle deco-circle-1"></div>
+      <div class="deco-circle deco-circle-2"></div>
+      <div class="deco-circle deco-circle-3"></div>
+    </div>
+    
     <!-- 渐变背景头部 -->
     <div class="hero-section">
       <div class="hero-content">
@@ -118,8 +133,12 @@
     <!-- 结果区域 -->
     <div class="results-wrapper" v-if="result">
       <!-- 行程概览 -->
-      <div class="trip-summary">
-        <p>{{ result.summary }}</p>
+      <div class="trip-summary" :class="{ 'ai-powered': isAIRecommendation }">
+        <div class="summary-badge" v-if="isAIRecommendation">
+          <span class="ai-icon">🤖</span>
+          <span>AI 智能推荐</span>
+        </div>
+        <p>{{ displaySummary }}</p>
         <button class="btn-save" @click="onSaveItinerary">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
@@ -142,7 +161,7 @@
           <span class="stat-value">{{ result.spots.length }}</span>
           <span class="stat-label">景点数</span>
         </div>
-        <div class="stat-item highlight">
+        <div class="stat-item" :class="getCostLevel(result.cost.perPersonCost)">
           <span class="stat-value">¥{{ result.cost.perPersonCost }}</span>
           <span class="stat-label">人均费用</span>
         </div>
@@ -178,8 +197,40 @@
                   </div>
                 </div>
               </div>
+              <!-- 交通信息（AI 推荐时显示详细信息） -->
               <div class="timeline-line" v-if="index < result.spots.length - 1">
-                <span class="travel-info">{{ result.route.points[index]?.travelTime || 15 }}分钟</span>
+                <div class="transport-detail" v-if="result.transportation && result.transportation[index]" @click.stop="toggleTransportDetail(index)">
+                  <div class="transport-summary">
+                    <span class="transport-method">{{ getTransportIcon(result.transportation[index].method) }} {{ result.transportation[index].method }}</span>
+                    <span class="transport-duration">{{ result.transportation[index].duration }}分钟</span>
+                    <span class="transport-distance">{{ result.transportation[index].distance }}km</span>
+                    <span class="transport-cost" v-if="result.transportation[index].cost > 0">¥{{ result.transportation[index].cost }}</span>
+                    <span class="expand-icon" v-if="result.transportation[index].steps?.length">{{ expandedTransport[index] ? '▲' : '▼' }}</span>
+                  </div>
+                  <!-- 详细步骤（点击展开） -->
+                  <div class="transport-steps" v-if="expandedTransport[index] && result.transportation[index].steps?.length">
+                    <div class="step-item" v-for="(step, stepIdx) in result.transportation[index].steps" :key="stepIdx">
+                      <span class="step-icon">{{ getStepIcon(step.type) }}</span>
+                      <div class="step-content">
+                        <div class="step-main">
+                          <span class="step-line" v-if="step.line">{{ step.line }}</span>
+                          <span class="step-instruction">{{ step.instruction }}</span>
+                        </div>
+                        <div class="step-detail" v-if="step.startStation && step.endStation">
+                          <span>{{ step.startStation }}</span>
+                          <span class="step-arrow">→</span>
+                          <span>{{ step.endStation }}</span>
+                          <span class="step-stations" v-if="step.stations">({{ step.stations }}站)</span>
+                        </div>
+                        <span class="step-duration">{{ step.duration }}分钟</span>
+                      </div>
+                    </div>
+                    <div class="transport-tips" v-if="result.transportation[index].tips">
+                      💡 {{ result.transportation[index].tips }}
+                    </div>
+                  </div>
+                </div>
+                <span class="travel-info" v-else>{{ result.route.points[index]?.travelTime || 15 }}分钟</span>
               </div>
             </div>
           </div>
@@ -238,11 +289,11 @@
           当地美食推荐
         </h3>
         <div class="food-grid">
-          <div v-for="food in foods" :key="food.id" class="food-card">
+          <div v-for="food in foods" :key="food.id" class="food-card" @click="goToFoodDetail(food.id)">
             <div class="food-img">
               <img v-if="food.imageUrl" :src="food.imageUrl" :alt="food.name" />
-              <div v-else class="img-placeholder"></div>
-              <span class="food-rating">{{ food.rating }}</span>
+              <div v-else class="img-placeholder">🍜</div>
+              <span class="food-rating">⭐ {{ food.rating }}</span>
             </div>
             <div class="food-info">
               <h4>{{ food.name }}</h4>
@@ -254,6 +305,9 @@
                   {{ food.tags.split(',').slice(0, 2).join(' · ') }}
                 </span>
               </div>
+              <div class="food-action">
+                <span class="view-detail">查看详情 →</span>
+              </div>
             </div>
           </div>
         </div>
@@ -261,9 +315,23 @@
 
       <!-- 地图 -->
       <div class="map-panel" v-if="result.spots.length > 0">
-        <h3 class="panel-title">路线地图</h3>
+        <h3 class="panel-title">
+          路线地图
+          <span class="ai-route-badge" v-if="result.aiPowered">🤖 AI 路线规划</span>
+        </h3>
+        <div class="map-legend" v-if="result.transportation && result.transportation.length > 0">
+          <span class="legend-item" v-for="(t, i) in result.transportation" :key="i">
+            <span class="legend-dot" :style="{ background: getTransportColor(t.method) }"></span>
+            {{ getTransportIcon(t.method) }} {{ t.method }}
+          </span>
+        </div>
         <div class="map-wrapper">
-          <TravelMap :spots="result.spots" :route-info="result.route" />
+          <TravelMap 
+            :spots="result.spots" 
+            :route-info="result.route"
+            :transportation="result.transportation"
+            :ai-powered="result.aiPowered"
+          />
         </div>
       </div>
     </div>
@@ -288,16 +356,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, reactive, computed, onMounted, onBeforeMount } from 'vue';
+import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { smartRecommend, saveItinerary, type SmartRecommendResponse } from '@/api/recommend';
+import { smartRecommend, saveItinerary, getUserItineraries, type SmartRecommendResponse } from '@/api/recommend';
 import { getAllRegions, type Region } from '@/api/region';
 import { recommendFoods, type Food } from '@/api/food';
 import TravelMap from '@/components/TravelMap.vue';
 import { useAuthStore } from '@/modules/auth/store';
 
+// 组件名称，用于 keep-alive 缓存
+defineOptions({
+  name: 'SmartRecommend'
+});
+
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const form = reactive({
@@ -317,6 +391,20 @@ const result = ref<SmartRecommendResponse | null>(null);
 const foods = ref<Food[]>([]);
 const loading = ref(false);
 const hasSearched = ref(false);
+
+// 交通详情展开状态
+const expandedTransport = ref<Record<number, boolean>>({});
+
+// 判断是否为 AI 推荐
+const isAIRecommendation = computed(() => {
+  return result.value?.summary?.includes('AI') || result.value?.summary?.includes('🤖');
+});
+
+// 显示的摘要（去掉前缀）
+const displaySummary = computed(() => {
+  if (!result.value?.summary) return '';
+  return result.value.summary.replace('🤖 AI智能推荐：', '').replace('【AI智能推荐】', '');
+});
 
 // 将地区按省份分组
 interface GroupedRegion {
@@ -393,11 +481,50 @@ function onSelectVisibleChange(visible: boolean) {
 }
 
 onMounted(async () => {
+  console.log('=== SmartRecommend onMounted ===');
+  console.log('当前 URL:', window.location.href);
+  console.log('route.query:', route.query);
+  
+  // 检查是否有自动推荐参数
+  if (route.query.autoRecommend === 'true') {
+    console.log('检测到 autoRecommend 参数！');
+  }
+  
+  // 先获取地区数据
   try {
     const res = await getAllRegions();
     regions.value = res.data || [];
+    console.log('地区数据加载完成，共', regions.value.length, '个');
   } catch (e) {
     console.error('获取地区失败', e);
+  }
+  
+  // 检查是否需要自动推荐
+  const query = route.query;
+  if (query.autoRecommend === 'true' && query.regionId) {
+    console.log('=== 检测到自动推荐参数 ===');
+    
+    // 填充表单
+    form.regionId = Number(query.regionId);
+    form.age = Number(query.age) || 25;
+    form.playTimeHours = Number(query.playTimeHours) || 8;
+    form.peopleCount = Number(query.peopleCount) || 2;
+    form.budget = query.budget ? Number(query.budget) : undefined;
+    form.preference = (query.preference as string) || '';
+    
+    console.log('表单已填充:', JSON.stringify({
+      regionId: form.regionId,
+      age: form.age,
+      playTimeHours: form.playTimeHours,
+      peopleCount: form.peopleCount
+    }));
+    
+    // 调用推荐接口
+    console.log('开始调用 onRecommend...');
+    onRecommend().then(() => {
+      console.log('onRecommend 完成，清除 URL 参数');
+      router.replace('/recommend');
+    });
   }
 });
 
@@ -421,6 +548,11 @@ async function onRecommend() {
       preference: form.preference
     });
     result.value = res.data;
+    console.log('推荐结果:', result.value);
+    console.log('交通信息:', result.value?.transportation);
+    
+    // 重置展开状态
+    expandedTransport.value = {};
 
     // 获取美食推荐
     try {
@@ -463,6 +595,59 @@ function goToSpot(id: number) {
   router.push(`/spots/${id}`);
 }
 
+// 获取交通方式图标
+function getTransportIcon(method: string): string {
+  const icons: Record<string, string> = {
+    '步行': '🚶',
+    '公交': '🚌',
+    '地铁': '🚇',
+    '打车': '🚕',
+    '骑行': '🚲',
+    '自驾': '🚗'
+  };
+  return icons[method] || '🚶';
+}
+
+// 获取交通方式颜色（与地图保持一致）
+function getTransportColor(method: string): string {
+  const colors: Record<string, string> = {
+    '步行': '#10b981',    // 绿色
+    '公交': '#3b82f6',    // 蓝色
+    '地铁': '#8b5cf6',    // 紫色
+    '打车': '#f59e0b',    // 橙色
+    '骑行': '#06b6d4',    // 青色
+    '自驾': '#ef4444'     // 红色
+  };
+  return colors[method] || '#667eea';
+}
+
+// 获取步骤图标
+function getStepIcon(type: string): string {
+  const icons: Record<string, string> = {
+    '步行': '🚶',
+    '公交': '🚌',
+    '地铁': '🚇',
+    '换乘': '🔄'
+  };
+  return icons[type] || '📍';
+}
+
+// 切换交通详情展开状态
+function toggleTransportDetail(index: number) {
+  expandedTransport.value[index] = !expandedTransport.value[index];
+}
+
+// 根据人均消费获取价格等级样式
+function getCostLevel(cost: number): string {
+  if (cost <= 100) {
+    return 'cost-low';      // 低消费 - 绿色
+  } else if (cost <= 300) {
+    return 'cost-medium';   // 中等消费 - 黄色
+  } else {
+    return 'cost-high';     // 高消费 - 红色
+  }
+}
+
 // 保存行程
 async function onSaveItinerary() {
   // 检查登录状态
@@ -484,13 +669,53 @@ async function onSaveItinerary() {
   }
 
   const name = `${getRegionName(form.regionId)}${playTimeMinutes.value >= 480 ? '一日游' : '半日游'}`;
-  const itineraryData = JSON.stringify(result.value);
-
+  
+  // 保存表单信息和结果，以便后续重新加载
+  const dataToSave = {
+    formData: {
+      regionId: form.regionId,
+      age: form.age,
+      playTimeHours: form.playTimeHours,
+      peopleCount: form.peopleCount,
+      budget: form.budget,
+      preference: form.preference
+    },
+    result: result.value
+  };
+  const itineraryData = JSON.stringify(dataToSave);
+  
+  // 检查是否已收藏相同行程
+  try {
+    const existingRes = await getUserItineraries(userId);
+    const existingItineraries = existingRes.data || [];
+    
+    // 比较景点ID列表是否相同
+    const currentSpotIds = result.value.spots.map(s => s.id).sort().join(',');
+    
+    for (const existing of existingItineraries) {
+      try {
+        const existingData = JSON.parse(existing.itineraryData || '{}');
+        const existingSpotIds = (existingData.spots || []).map((s: any) => s.id).sort().join(',');
+        
+        if (currentSpotIds === existingSpotIds) {
+          ElMessage.warning('该行程已收藏过，无需重复收藏');
+          return;
+        }
+      } catch (e) {
+        // 解析失败，继续检查下一个
+      }
+    }
+  } catch (e) {
+    // 获取已有行程失败，继续保存
+    console.log('检查重复失败，继续保存');
+  }
+  
+  // 保存到数据库
   try {
     await saveItinerary(userId, name, itineraryData);
-    ElMessage.success('行程保存成功！');
+    ElMessage.success('行程收藏成功！可在"我的"页面查看');
   } catch (e) {
-    console.error(e);
+    console.error('保存失败', e);
     ElMessage.error('保存失败，请稍后重试');
   }
 }
@@ -500,12 +725,91 @@ function getRegionName(regionId: number | null): string {
   const region = regions.value.find(r => r.id === regionId);
   return region ? region.name : '';
 }
+
+// 跳转到美食详情页
+function goToFoodDetail(foodId: number) {
+  router.push(`/foods/${foodId}`);
+}
 </script>
 
 <style scoped>
 .smart-recommend-page {
-  min-height: 100vh;
+  min-height: calc(100vh - 80px);
   background: linear-gradient(180deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
+  border-radius: 40px;
+  overflow: hidden;
+  margin: 0 -20px;
+  position: relative;
+}
+
+/* 装饰元素容器 */
+.decorations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 浮动 emoji 图标 */
+.deco {
+  position: absolute;
+  font-size: 32px;
+  opacity: 0.15;
+  animation: float 6s ease-in-out infinite;
+}
+
+.deco-1 { top: 10%; left: 5%; animation-delay: 0s; font-size: 40px; }
+.deco-2 { top: 25%; left: 8%; animation-delay: 1s; }
+.deco-3 { top: 45%; left: 3%; animation-delay: 2s; font-size: 28px; }
+.deco-4 { top: 65%; left: 6%; animation-delay: 0.5s; font-size: 36px; }
+.deco-5 { top: 15%; right: 5%; animation-delay: 1.5s; font-size: 38px; }
+.deco-6 { top: 35%; right: 7%; animation-delay: 2.5s; }
+.deco-7 { top: 55%; right: 4%; animation-delay: 0.8s; font-size: 30px; }
+.deco-8 { top: 75%; right: 6%; animation-delay: 1.8s; font-size: 34px; }
+
+/* 装饰圆圈 */
+.deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.deco-circle-1 {
+  width: 200px;
+  height: 200px;
+  top: 20%;
+  left: -50px;
+  animation-delay: 0s;
+}
+
+.deco-circle-2 {
+  width: 150px;
+  height: 150px;
+  top: 60%;
+  right: -30px;
+  animation-delay: 1s;
+}
+
+.deco-circle-3 {
+  width: 100px;
+  height: 100px;
+  bottom: 15%;
+  left: 2%;
+  animation-delay: 2s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.1; }
+  50% { transform: scale(1.1); opacity: 0.2; }
 }
 
 /* Hero 区域 */
@@ -534,10 +838,12 @@ function getRegionName(regionId: number | null): string {
 
 /* 搜索卡片 */
 .search-card {
-  background: #fff;
-  border-radius: 20px;
-  padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 28px;
+  padding: 36px;
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
 .form-section {
@@ -767,6 +1073,34 @@ function getRegionName(regionId: number | null): string {
   line-height: 1.6;
 }
 
+/* AI 推荐样式 */
+.trip-summary.ai-powered {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 2px solid rgba(124, 58, 237, 0.3);
+}
+
+.trip-summary.ai-powered p {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.ai-icon {
+  font-size: 16px;
+}
+
 .btn-save {
   display: flex;
   align-items: center;
@@ -803,12 +1137,33 @@ function getRegionName(regionId: number | null): string {
   text-align: center;
 }
 
-.stat-item.highlight {
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+/* 人均消费 - 低消费（绿色）≤100元 */
+.stat-item.cost-low {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
 }
 
-.stat-item.highlight .stat-value,
-.stat-item.highlight .stat-label {
+.stat-item.cost-low .stat-value,
+.stat-item.cost-low .stat-label {
+  color: #fff;
+}
+
+/* 人均消费 - 中等消费（黄色）100-300元 */
+.stat-item.cost-medium {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.stat-item.cost-medium .stat-value,
+.stat-item.cost-medium .stat-label {
+  color: #fff;
+}
+
+/* 人均消费 - 高消费（红色）>300元 */
+.stat-item.cost-high {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+}
+
+.stat-item.cost-high .stat-value,
+.stat-item.cost-high .stat-label {
   color: #fff;
 }
 
@@ -953,24 +1308,163 @@ function getRegionName(regionId: number | null): string {
 }
 
 .timeline-line {
-  position: absolute;
-  left: 15px;
-  top: 40px;
-  bottom: 0;
-  width: 2px;
-  background: #e5e7eb;
+  position: relative;
+  margin: 16px 0 16px 15px;
+  padding-left: 24px;
+  min-height: 50px;
+  border-left: 2px solid #e5e7eb;
 }
 
 .travel-info {
+  display: inline-block;
+  font-size: 12px;
+  color: #9ca3af;
+  background: #f9fafb;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+/* AI 交通信息 */
+.transport-info {
   position: absolute;
   left: 24px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.transport-method {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c3aed;
+}
+
+.transport-duration {
+  font-size: 11px;
+  color: #6b7280;
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.transport-distance {
   font-size: 11px;
   color: #9ca3af;
-  background: #fff;
+}
+
+.transport-cost {
+  font-size: 11px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* 交通详情（可展开） */
+.transport-detail {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.transport-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
+  border-radius: 12px;
+}
+
+.expand-icon {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.transport-steps {
+  padding: 12px 14px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.step-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.step-item:last-child {
+  border-bottom: none;
+}
+
+.step-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.step-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.step-instruction {
+  font-size: 13px;
+  color: #374151;
+}
+
+.step-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.step-arrow {
+  color: #9ca3af;
+}
+
+.step-stations {
+  color: #9ca3af;
+}
+
+.step-duration {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+.transport-tips {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: #fffbeb;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #92400e;
 }
 
 /* 侧边面板 */
@@ -1076,11 +1570,16 @@ function getRegionName(regionId: number | null): string {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
 }
 
 .food-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.food-card:hover .view-detail {
+  color: #667eea;
 }
 
 .food-img {
@@ -1153,12 +1652,75 @@ function getRegionName(regionId: number | null): string {
   color: #9ca3af;
 }
 
+.food-action {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.view-detail {
+  font-size: 13px;
+  color: #999;
+  transition: color 0.3s;
+}
+
+.food-img .img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
+  font-size: 48px;
+}
+
 /* 地图 */
 .map-panel {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
   padding: 24px;
   margin-top: 20px;
+}
+
+.map-panel .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ai-route-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
 }
 
 .map-wrapper {

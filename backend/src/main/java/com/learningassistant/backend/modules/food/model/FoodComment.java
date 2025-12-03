@@ -1,4 +1,4 @@
-package com.learningassistant.backend.modules.order.model;
+package com.learningassistant.backend.modules.food.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -6,42 +6,50 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 评论实体
- * 模块: order (成员4)
+ * 美食评论实体
  */
 @Entity
-@Table(name = "comments")
+@Table(name = "food_comments")
 @Data
-public class Comment {
+public class FoodComment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long userId;
-    private String userName;
-    private Long spotId;
+    @Column(name = "food_id", nullable = false)
+    private Long foodId;
 
-    @Column(columnDefinition = "text")
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "user_name")
+    private String userName;
+
+    @Column(nullable = false)
+    private Integer rating;
+
+    @Column(columnDefinition = "TEXT")
     private String content;
-    
-    @Column(columnDefinition = "INTEGER DEFAULT 5")
-    private Integer rating = 5;
-    
+
     @Column(columnDefinition = "INTEGER DEFAULT 0")
     private Integer likes = 0;
     
     // 父评论ID（用于回复功能）
+    @Column(name = "parent_id")
     private Long parentId;
     
     // 回复的用户ID
+    @Column(name = "reply_to_user_id")
     private Long replyToUserId;
     
     // 回复的用户名
-    private String replyToUserName;
+    @Column(name = "reply_to_user")
+    private String replyToUser;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
     
     // 回复列表（非持久化字段，用于返回给前端）
     @Transient
-    private List<Comment> replies;
+    private List<FoodComment> replies;
 }

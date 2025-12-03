@@ -46,7 +46,7 @@
       </form>
       
       <div class="login-footer">
-        <p>还没有账户？<a href="#">立即注册</a></p>
+        <p>还没有账户？<router-link to="/register">立即注册</router-link></p>
       </div>
     </div>
     
@@ -60,24 +60,24 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { login } from '@/api/auth';
-import { useAuth } from '@/composables/useAuth';
-import router from '@/router';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/modules/auth/store';
+import { ElMessage } from 'element-plus';
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const username = ref('');
 const password = ref('');
 const msg = ref('');
 const loading = ref(false);
 
-const { setToken } = useAuth();
-
 async function onSubmit() {
   loading.value = true;
   msg.value = '';
   try {
-    const res = await login({ username: username.value, password: password.value });
-    const token = res.data.token || res.data;
-    setToken(token);
+    await authStore.login(username.value, password.value);
+    ElMessage.success('登录成功');
     router.push('/');
   } catch (e: any) {
     msg.value = e?.response?.data || '登录失败，请检查用户名和密码';

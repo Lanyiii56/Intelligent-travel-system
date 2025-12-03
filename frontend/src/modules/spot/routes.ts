@@ -23,6 +23,12 @@ const spotRoutes: RouteRecordRaw[] = [
     component: () => import('@/pages/SpotDetail.vue'),
     meta: { title: '景点详情' }
   },
+  {
+    path: '/foods/:id',
+    name: 'FoodDetail',
+    component: () => import('@/pages/FoodDetail.vue'),
+    meta: { title: '美食详情' }
+  },
 ];
 
 export default spotRoutes;

@@ -1,5 +1,20 @@
 <template>
   <div class="recommend-page">
+    <!-- 装饰元素 -->
+    <div class="decorations">
+      <span class="deco deco-1">✈️</span>
+      <span class="deco deco-2">🏝️</span>
+      <span class="deco deco-3">🎒</span>
+      <span class="deco deco-4">🗺️</span>
+      <span class="deco deco-5">⛰️</span>
+      <span class="deco deco-6">🌴</span>
+      <span class="deco deco-7">🚂</span>
+      <span class="deco deco-8">🏰</span>
+      <div class="deco-circle deco-circle-1"></div>
+      <div class="deco-circle deco-circle-2"></div>
+      <div class="deco-circle deco-circle-3"></div>
+    </div>
+    
     <!-- 渐变背景头部 -->
     <div class="hero-section">
       <div class="hero-content">
@@ -177,8 +192,81 @@ function getRankClass(index: number): string {
 
 <style scoped>
 .recommend-page {
-  min-height: 100vh;
+  min-height: calc(100vh - 80px);
   background: linear-gradient(180deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
+  border-radius: 40px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 装饰元素容器 */
+.decorations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 浮动 emoji 图标 */
+.deco {
+  position: absolute;
+  font-size: 32px;
+  opacity: 0.15;
+  animation: float 6s ease-in-out infinite;
+}
+
+.deco-1 { top: 10%; left: 5%; animation-delay: 0s; font-size: 40px; }
+.deco-2 { top: 25%; left: 8%; animation-delay: 1s; }
+.deco-3 { top: 45%; left: 3%; animation-delay: 2s; font-size: 28px; }
+.deco-4 { top: 65%; left: 6%; animation-delay: 0.5s; font-size: 36px; }
+.deco-5 { top: 15%; right: 5%; animation-delay: 1.5s; font-size: 38px; }
+.deco-6 { top: 35%; right: 7%; animation-delay: 2.5s; }
+.deco-7 { top: 55%; right: 4%; animation-delay: 0.8s; font-size: 30px; }
+.deco-8 { top: 75%; right: 6%; animation-delay: 1.8s; font-size: 34px; }
+
+/* 装饰圆圈 */
+.deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.deco-circle-1 {
+  width: 200px;
+  height: 200px;
+  top: 20%;
+  left: -50px;
+  animation-delay: 0s;
+}
+
+.deco-circle-2 {
+  width: 150px;
+  height: 150px;
+  top: 60%;
+  right: -30px;
+  animation-delay: 1s;
+}
+
+.deco-circle-3 {
+  width: 100px;
+  height: 100px;
+  bottom: 15%;
+  left: 2%;
+  animation-delay: 2s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.1; }
+  50% { transform: scale(1.1); opacity: 0.2; }
 }
 
 /* Hero 区域 */

@@ -7,17 +7,23 @@
       <div class="panel-header">
         <el-icon><Guide /></el-icon>
         <span>路线概览</span>
-        <span class="route-type estimate">估算</span>
+        <span class="route-type estimate">距离估算</span>
       </div>
       <div class="panel-content">
         <div class="route-stat">
-          <span class="stat-label">总距离</span>
+          <span class="stat-label">直线距离</span>
           <span class="stat-value highlight">
             {{ actualRouteInfo.distance }} km
           </span>
         </div>
+        <div class="route-stat">
+          <span class="stat-label">预估路程</span>
+          <span class="stat-value">
+            约 {{ (actualRouteInfo.distance * 1.4).toFixed(1) }} km
+          </span>
+        </div>
         <div class="route-divider"></div>
-        <div class="transport-title">预计出行时间</div>
+        <div class="transport-title">预计出行时间（参考）</div>
         <div class="route-stat">
           <span class="stat-label">🚗 驾车</span>
           <span class="stat-value">{{ formatTimeRange(actualRouteInfo.drivingTime) }}</span>
@@ -34,6 +40,9 @@
           <span class="stat-label">🚶 步行</span>
           <span class="stat-value">{{ formatTime(actualRouteInfo.walkingTime) }}</span>
         </div>
+        <div class="route-note">
+          * 时间为估算值，实际出行请参考导航软件
+        </div>
       </div>
     </div>
   </div>
@@ -43,12 +52,14 @@
 import { ref, onMounted, watch, onUnmounted } from 'vue';
 import AMapLoader from '@amap/amap-jsapi-loader';
 import { Guide } from '@element-plus/icons-vue';
-import type { RouteInfo, SpotRecommend } from '@/api/recommend';
+import type { RouteInfo, SpotRecommend, TransportInfo } from '@/api/recommend';
 import { AMAP_CONFIG } from '@/config/amap';
 
 const props = defineProps<{
   spots: SpotRecommend[];
   routeInfo?: RouteInfo;
+  transportation?: TransportInfo[];  // AI 推荐的交通信息
+  aiPowered?: boolean;               // 是否为 AI 推荐
 }>();
 
 const emit = defineEmits<{
@@ -153,10 +164,18 @@ function renderSpots() {
     markers.push(marker);
   });
 
-  // 绘制路线
+  // 绘制路线 - 直接使用直线连接（高德免费版不支持路线规划API）
   if (positions.length > 1) {
-    // 尝试使用驾车路线规划，如果失败则使用直线
-    planDrivingRoute(positions);
+    drawFallbackPolyline(positions);
+    
+    // 计算直线距离并估算各交通方式时间
+    const straightDistance = calculateStraightDistance(positions);
+    actualRouteInfo.value = calculateAllTransportTimes(straightDistance);
+    
+    emit('route-calculated', {
+      distance: straightDistance,
+      time: actualRouteInfo.value.drivingTime.min
+    });
   }
 
   // 调整视野
@@ -165,74 +184,27 @@ function renderSpots() {
   }
 }
 
-// 驾车路线规划 - 分段规划每两个相邻景点之间的路线
-async function planDrivingRoute(positions: [number, number][]) {
-  if (!AMap || positions.length < 2) return;
+// 注意：高德路线规划API需要付费，已禁用
+// 现在直接使用直线连接和距离估算
 
-  let totalDistance = 0;
-  let totalTime = 0;
-  let allSuccess = true;
-
-  // 分段规划：每两个相邻景点之间规划一条路线
-  for (let i = 0; i < positions.length - 1; i++) {
-    const start = positions[i];
-    const end = positions[i + 1];
-    
-    try {
-      const result = await planSingleRoute(start, end, i);
-      if (result) {
-        totalDistance += result.distance;
-        totalTime += result.time;
-      } else {
-        allSuccess = false;
-      }
-    } catch (e) {
-      console.error(`第${i + 1}段路线规划失败:`, e);
-      allSuccess = false;
-    }
-  }
-
-  if (allSuccess && totalDistance > 0) {
-    const distanceKm = parseFloat((totalDistance / 1000).toFixed(1));
-    // 高德返回的时间单位是秒，需要转换为分钟
-    const drivingMin = Math.round(totalTime / 60);
-    
-    actualRouteInfo.value = calculateAllTransportTimes(distanceKm, drivingMin);
-    
-    emit('route-calculated', {
-      distance: distanceKm,
-      time: drivingMin
-    });
-    
-    console.log(`总驾车距离: ${distanceKm} km, 驾车时间: ${drivingMin} 分钟`);
-  } else {
-    // 如果路线规划失败，显示直线并估算距离
-    console.log('路线规划失败，使用直线连接');
-    drawFallbackPolyline(positions);
-    
-    // 计算直线距离并估算各交通方式时间
-    const straightDistance = calculateStraightDistance(positions);
-    actualRouteInfo.value = calculateAllTransportTimes(straightDistance);
-  }
-}
-
-// 计算各种交通方式的时间（含拥堵误差）
+// 计算各种交通方式的时间（含拥堵误差，保守估算）
 function calculateAllTransportTimes(distanceKm: number, actualDrivingTime?: number): RouteEstimate {
-  // 直线距离转实际道路距离的系数（道路通常比直线长30%-50%）
-  const roadFactor = 1.4;
+  // 直线距离转实际道路距离的系数（道路通常比直线长40%-80%，取较大值更保守）
+  const roadFactor = 1.6;
   const roadDistance = distanceKm * roadFactor;
   
   // 根据距离判断是城市内还是城际出行
-  const isLongDistance = distanceKm > 20; // 超过20km视为长途
+  const isLongDistance = distanceKm > 15; // 超过15km视为长途
   
-  // 驾车时间计算
-  const drivingSpeed = isLongDistance ? 60 : 35; // 长途60km/h，城市35km/h
+  // 驾车时间计算（考虑红绿灯、找停车位等）
+  // 城市平均速度更低：25-30km/h，长途：50km/h
+  const drivingSpeed = isLongDistance ? 50 : 25;
   const baseDrivingTime = actualDrivingTime || Math.round(roadDistance / drivingSpeed * 60);
   
-  // 拥堵系数：城市内拥堵影响更大
+  // 拥堵系数：城市内拥堵影响更大，增加误差范围
   const trafficFactor = {
-    min: 1.0,                           // 畅通
-    max: isLongDistance ? 1.3 : 1.5     // 拥堵：长途+30%，城市+50%
+    min: 1.2,                           // 畅通也要预留缓冲
+    max: isLongDistance ? 1.8 : 2.2     // 拥堵：长途+80%，城市+120%
   };
   
   const drivingTime: TimeRange = {
@@ -240,22 +212,22 @@ function calculateAllTransportTimes(distanceKm: number, actualDrivingTime?: numb
     max: Math.round(baseDrivingTime * trafficFactor.max)
   };
   
-  // 公交时间计算：基于驾车时间的倍数
-  // 城市公交约为驾车的1.5-2倍，长途大巴约为驾车的1.2-1.5倍
+  // 公交时间计算：基于驾车时间的倍数（含等车、换乘、绕路）
+  // 城市公交约为驾车的2-3倍，长途大巴约为驾车的1.5-2倍
   const transitMultiplier = isLongDistance 
-    ? { min: 1.2, max: 1.5 }   // 长途大巴
-    : { min: 1.5, max: 2.2 };  // 城市公交（含等车、换乘）
+    ? { min: 1.5, max: 2.5 }   // 长途大巴（含候车）
+    : { min: 2.0, max: 3.5 };  // 城市公交（含等车、换乘、步行到站）
   
   const transitTime: TimeRange = {
     min: Math.round(baseDrivingTime * transitMultiplier.min),
     max: Math.round(baseDrivingTime * transitMultiplier.max)
   };
   
-  // 骑行时间：平均速度12-18km/h，取中间值15km/h
-  const cyclingTime = Math.round(roadDistance / 15 * 60);
+  // 骑行时间：平均速度8-10km/h（考虑等红灯、上坡、观光等）
+  const cyclingTime = Math.round(roadDistance / 8 * 60);
   
-  // 步行时间：平均速度5km/h
-  const walkingTime = Math.round(roadDistance / 5 * 60);
+  // 步行时间：旅游步行速度约2.5-3km/h（边走边看、拍照、休息）
+  const walkingTime = Math.round(roadDistance / 2.5 * 60);
   
   return {
     distance: distanceKm,
@@ -287,9 +259,29 @@ function getDistance(p1: [number, number], p2: [number, number]): number {
   return R * c;
 }
 
-// 规划单段路线
+// 获取交通方式对应的颜色
+function getTransportColor(method?: string): string {
+  const colors: Record<string, string> = {
+    '步行': '#10b981',    // 绿色
+    '公交': '#3b82f6',    // 蓝色
+    '地铁': '#8b5cf6',    // 紫色
+    '打车': '#f59e0b',    // 橙色
+    '骑行': '#06b6d4',    // 青色
+    '自驾': '#ef4444'     // 红色
+  };
+  return colors[method || ''] || '#667eea';  // 默认紫蓝色
+}
+
+// ============ 以下为高德路线规划API相关代码（需付费，已禁用）============
+// 如果将来开通付费服务，可以取消注释使用
+
+/*
+// 规划单段路线（需要高德付费API）
 function planSingleRoute(start: [number, number], end: [number, number], index: number): Promise<{ distance: number; time: number } | null> {
   return new Promise((resolve) => {
+    const transportMethod = props.transportation?.[index]?.method;
+    const routeColor = getTransportColor(transportMethod);
+    
     const drivingInstance = new AMap.Driving({
       policy: AMap.DrivingPolicy.LEAST_TIME
     });
@@ -300,13 +292,11 @@ function planSingleRoute(start: [number, number], end: [number, number], index: 
       (status: string, result: any) => {
         if (status === 'complete' && result.routes && result.routes[0]) {
           const route = result.routes[0];
-          
-          // 绘制路线
           const path = parseRouteToPath(route);
           if (path.length > 0) {
             const polyline = new AMap.Polyline({
               path: path,
-              strokeColor: '#667eea',
+              strokeColor: routeColor,
               strokeWeight: 6,
               strokeOpacity: 0.9,
               lineJoin: 'round',
@@ -317,13 +307,8 @@ function planSingleRoute(start: [number, number], end: [number, number], index: 
             polyline.setMap(map);
             routePolylines.push(polyline);
           }
-          
-          resolve({
-            distance: route.distance,
-            time: route.time
-          });
+          resolve({ distance: route.distance, time: route.time });
         } else {
-          console.error(`段落${index + 1}路线规划失败:`, status, result);
           resolve(null);
         }
       }
@@ -331,10 +316,8 @@ function planSingleRoute(start: [number, number], end: [number, number], index: 
   });
 }
 
-// 解析路线结果为路径点数组
 function parseRouteToPath(route: any): [number, number][] {
   const path: [number, number][] = [];
-  
   if (route.steps) {
     route.steps.forEach((step: any) => {
       if (step.path) {
@@ -344,9 +327,10 @@ function parseRouteToPath(route: any): [number, number][] {
       }
     });
   }
-  
   return path;
 }
+*/
+// ============ 高德付费API代码结束 ============
 
 // 备用：直线连接（当路线规划失败时使用）
 function drawFallbackPolyline(positions: [number, number][]) {
@@ -499,6 +483,15 @@ onUnmounted(() => {
   font-weight: 600;
   color: #667eea;
 }
+
+.route-note {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #eee;
+  font-size: 11px;
+  color: #999;
+  line-height: 1.4;
+}
 </style>
 
 <style>
@@ -537,5 +530,27 @@ onUnmounted(() => {
 .info-window .reason {
   color: #667eea;
   font-size: 12px;
+}
+
+/* AI 交通方式标签 */
+.transport-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.transport-label .transport-icon {
+  font-size: 14px;
+}
+
+.transport-label .transport-text {
+  color: #666;
+  font-weight: 500;
 }
 </style>

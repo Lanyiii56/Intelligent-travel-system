@@ -14,7 +14,7 @@ const authRoutes: RouteRecordRaw[] = [
   {
     path: '/register',
     name: 'Register',
-    component: () => import('@/pages/Login.vue'),
+    component: () => import('@/pages/Register.vue'),
     meta: { title: '注册', guest: true }
   },
   {
