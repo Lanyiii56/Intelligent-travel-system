@@ -34,7 +34,58 @@
       <router-view />
     </main>
     <footer class="footer">
-      <p>© 2024 智游天下 - 发现世界的美好</p>
+      <!-- 页脚链接区 -->
+      <div class="footer-links">
+        <a href="#">联系客服</a>
+        <span class="divider">|</span>
+        <a href="#">开放平台</a>
+        <span class="divider">|</span>
+        <a href="#">法律声明</a>
+        <span class="divider">|</span>
+        <a href="#">廉正举报</a>
+        <span class="divider">|</span>
+        <a href="#">隐私政策</a>
+      </div>
+      
+      <!-- 版权信息 -->
+      <div class="footer-copyright">
+        <span>智游天下版权所有 2024-现在</span>
+        <span class="divider">|</span>
+        <span>增值电信业务经营许可证：川B2-20240001</span>
+        <span class="divider">|</span>
+        <span>川公网安备 51000002000001号</span>
+      </div>
+      
+      <!-- 合作伙伴 -->
+      <div class="footer-partners">
+        <a href="#">携程旅行</a>
+        <span class="divider">|</span>
+        <a href="#">去哪儿网</a>
+        <span class="divider">|</span>
+        <a href="#">飞猪旅行</a>
+        <span class="divider">|</span>
+        <a href="#">马蜂窝</a>
+        <span class="divider">|</span>
+        <a href="#">途牛旅游</a>
+        <span class="divider">|</span>
+        <a href="#">同程旅行</a>
+        <span class="divider">|</span>
+        <a href="#">高德地图</a>
+        <span class="divider">|</span>
+        <a href="#">美团</a>
+      </div>
+      
+      <!-- 认证图标 -->
+      <div class="footer-badges">
+        <div class="badge-item">
+          <img src="https://img.alicdn.com/tfs/TB1..50QpXXXXX7XpXXXXXXXXXX-40-40.png" alt="诚信网站" />
+          <span>诚信网站</span>
+        </div>
+        <div class="badge-item">
+          <img src="https://img.alicdn.com/tfs/TB1..50QpXXXXX7XpXXXXXXXXXX-40-40.png" alt="网警" />
+          <span>网上有害信息举报</span>
+        </div>
+      </div>
     </footer>
   </div>
 </template>
@@ -168,20 +219,68 @@ function handleLogout() {
 }
 
 .footer {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
+  background: #f5f5f5;
+  border-top: 1px solid #e8e8e8;
   padding: 24px 20px;
   text-align: center;
-  color: #666;
-  font-size: 14px;
+  color: #999;
+  font-size: 12px;
   margin-top: auto;
 }
 
-.footer p {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 500;
+.footer-links {
+  margin-bottom: 12px;
+}
+
+.footer-links a {
+  color: #666;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: #667eea;
+}
+
+.footer .divider {
+  margin: 0 12px;
+  color: #ddd;
+}
+
+.footer-copyright {
+  margin-bottom: 12px;
+  color: #999;
+}
+
+.footer-partners {
+  margin-bottom: 16px;
+}
+
+.footer-partners a {
+  color: #999;
+  transition: color 0.2s;
+}
+
+.footer-partners a:hover {
+  color: #667eea;
+}
+
+.footer-badges {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-top: 16px;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #bbb;
+}
+
+.badge-item img {
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
 }
 </style>

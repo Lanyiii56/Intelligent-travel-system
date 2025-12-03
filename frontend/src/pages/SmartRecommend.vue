@@ -21,9 +21,16 @@
           <div class="form-grid">
             <div class="form-item">
               <label>目的地</label>
-              <el-select v-model="form.regionId" placeholder="选择城市或地区" size="large">
+              <el-select 
+                v-model="form.regionId" 
+                placeholder="输入城市名搜索，如：宜宾、四川" 
+                size="large"
+                filterable
+                :filter-method="filterRegions"
+                @visible-change="onSelectVisibleChange"
+              >
                 <el-option-group
-                  v-for="province in groupedRegions"
+                  v-for="province in filteredRegions"
                   :key="province.id"
                   :label="province.name"
                 >
@@ -46,17 +53,12 @@
 
             <div class="form-item">
               <label>年龄</label>
-              <el-input-number v-model="form.age" :min="1" :max="120" controls-position="right" size="large" />
+              <el-input v-model.number="form.age" placeholder="请输入年龄" size="large" type="number" :min="1" :max="120" />
             </div>
 
             <div class="form-item">
-              <label>游玩时长</label>
-              <el-select v-model="form.playTime" placeholder="选择时长" size="large">
-                <el-option label="半天游 (4小时)" :value="240" />
-                <el-option label="一日游 (8小时)" :value="480" />
-                <el-option label="两日游" :value="960" />
-                <el-option label="三日游" :value="1440" />
-              </el-select>
+              <label>游玩时长（小时）</label>
+              <el-input v-model.number="form.playTimeHours" placeholder="请输入时长" size="large" type="number" :min="1" :max="72" />
             </div>
 
             <div class="form-item">
@@ -301,11 +303,14 @@ const authStore = useAuthStore();
 const form = reactive({
   regionId: null as number | null,
   age: 25,
-  playTime: 480,
+  playTimeHours: 8, // 用小时作为输入单位
   peopleCount: 2,
   budget: undefined as number | undefined,
   preference: ''
 });
+
+// 计算属性：将小时转换为分钟
+const playTimeMinutes = computed(() => form.playTimeHours * 60);
 
 const regions = ref<Region[]>([]);
 const result = ref<SmartRecommendResponse | null>(null);
@@ -320,6 +325,9 @@ interface GroupedRegion {
   cities: Region[];
 }
 
+// 搜索关键词
+const searchKeyword = ref('');
+
 const groupedRegions = computed<GroupedRegion[]>(() => {
   // 获取所有省份（parentId 为空）
   const provinces = regions.value.filter(r => !r.parentId);
@@ -330,6 +338,59 @@ const groupedRegions = computed<GroupedRegion[]>(() => {
     cities: regions.value.filter(r => r.parentId === province.id)
   }));
 });
+
+// 过滤后的地区列表
+const filteredRegions = computed<GroupedRegion[]>(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase();
+  
+  // 如果没有搜索关键词，返回所有地区
+  if (!keyword) {
+    return groupedRegions.value;
+  }
+  
+  const result: GroupedRegion[] = [];
+  
+  for (const province of groupedRegions.value) {
+    // 检查省份名是否匹配
+    const provinceMatch = province.name.toLowerCase().includes(keyword);
+    
+    // 过滤匹配的城市
+    const matchedCities = province.cities.filter(city => 
+      city.name.toLowerCase().includes(keyword)
+    );
+    
+    // 如果省份匹配，显示该省份下所有城市
+    if (provinceMatch) {
+      result.push({
+        id: province.id,
+        name: province.name,
+        cities: province.cities
+      });
+    } 
+    // 如果有匹配的城市，只显示匹配的城市
+    else if (matchedCities.length > 0) {
+      result.push({
+        id: province.id,
+        name: province.name,
+        cities: matchedCities
+      });
+    }
+  }
+  
+  return result;
+});
+
+// 搜索过滤方法
+function filterRegions(query: string) {
+  searchKeyword.value = query;
+}
+
+// 下拉框显示/隐藏时重置搜索
+function onSelectVisibleChange(visible: boolean) {
+  if (!visible) {
+    searchKeyword.value = '';
+  }
+}
 
 onMounted(async () => {
   try {
@@ -354,7 +415,7 @@ async function onRecommend() {
     const res = await smartRecommend({
       regionId: form.regionId,
       age: form.age,
-      playTime: form.playTime,
+      playTime: playTimeMinutes.value,
       peopleCount: form.peopleCount,
       budget: form.budget,
       preference: form.preference
@@ -422,7 +483,7 @@ async function onSaveItinerary() {
     return;
   }
 
-  const name = `${getRegionName(form.regionId)}${form.playTime >= 480 ? '一日游' : '半日游'}`;
+  const name = `${getRegionName(form.regionId)}${playTimeMinutes.value >= 480 ? '一日游' : '半日游'}`;
   const itineraryData = JSON.stringify(result.value);
 
   try {
@@ -527,20 +588,48 @@ function getRegionName(regionId: number | null): string {
 }
 
 .form-item :deep(.el-select),
-.form-item :deep(.el-input-number) {
+.form-item :deep(.el-input-number),
+.form-item :deep(.el-input) {
   width: 100%;
 }
 
-.form-item :deep(.el-input__wrapper) {
-  background: transparent !important;
-  box-shadow: none;
+/* 通用输入框样式 */
+.form-item :deep(.el-input .el-input__wrapper) {
+  background: #f3f4f6 !important;
+  box-shadow: none !important;
+  border: none !important;
   border-radius: 10px;
-  padding: 4px 12px;
+  padding: 8px 12px;
+  min-height: 42px;
 }
 
-.form-item :deep(.el-input__wrapper:hover),
-.form-item :deep(.el-input__wrapper.is-focus) {
-  box-shadow: none;
+.form-item :deep(.el-input .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 2px #7c3aed !important;
+}
+
+.form-item :deep(.el-input .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px #7c3aed !important;
+}
+
+.form-item :deep(.el-input .el-input__inner) {
+  color: #1f2937 !important;
+  -webkit-text-fill-color: #1f2937 !important;
+}
+
+.form-item :deep(.el-input .el-input__inner::placeholder) {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
+}
+
+/* 隐藏 number 输入框的上下箭头 */
+.form-item :deep(.el-input input[type="number"]::-webkit-inner-spin-button),
+.form-item :deep(.el-input input[type="number"]::-webkit-outer-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-item :deep(.el-input input[type="number"]) {
+  -moz-appearance: textfield;
 }
 
 /* Select 下拉框样式 */

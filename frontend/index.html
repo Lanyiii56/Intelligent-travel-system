@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>旅游平台</title>
+    <!-- 高德地图安全配置 -->
+    <!-- 
+      重要：需要配置安全密钥才能使用驾车路线规划等高级功能
+      1. 登录 https://console.amap.com/dev/key/app
+      2. 找到你的应用，复制"安全密钥"
+      3. 填入下方 securityJsCode
+    -->
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '你的安全密钥' // 从高德控制台获取
+        }
+    </script>
 </head>
 <body>
 <div id="app">正在加载...</div>
