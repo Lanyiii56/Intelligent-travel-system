@@ -26,7 +26,14 @@ public class Hotel {
     private Double priceMin;  // 最低价格
     private Double priceMax;  // 最高价格
 
-    private Double rating;    // 评分 (1-5)
+    // 评分（根据用户评论动态计算）
+    @Column(columnDefinition = "DOUBLE PRECISION DEFAULT 0")
+    private Double rating = 0.0;
+    
+    // 评论数量
+    @Column(columnDefinition = "INTEGER DEFAULT 0")
+    private Integer commentCount = 0;
+    
     private Integer stars;    // 星级 (1-5)
 
     private Double latitude;

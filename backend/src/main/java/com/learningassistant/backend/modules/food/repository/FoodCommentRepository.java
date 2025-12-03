@@ -2,6 +2,8 @@ package com.learningassistant.backend.modules.food.repository;
 
 import com.learningassistant.backend.modules.food.model.FoodComment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -51,4 +53,16 @@ public interface FoodCommentRepository extends JpaRepository<FoodComment, Long> 
      * 获取某评论的回复列表
      */
     List<FoodComment> findByParentIdOrderByCreatedAtAsc(Long parentId);
+    
+    /**
+     * 计算美食的平均评分（只计算顶级评论，不包括回复）
+     */
+    @Query("SELECT AVG(c.rating) FROM FoodComment c WHERE c.foodId = :foodId AND c.parentId IS NULL AND c.rating IS NOT NULL")
+    Double calculateAverageRating(@Param("foodId") Long foodId);
+    
+    /**
+     * 统计美食的评论数量（只计算顶级评论）
+     */
+    @Query("SELECT COUNT(c) FROM FoodComment c WHERE c.foodId = :foodId AND c.parentId IS NULL")
+    Long countTopLevelComments(@Param("foodId") Long foodId);
 }

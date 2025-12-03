@@ -4,6 +4,8 @@ import com.learningassistant.backend.modules.order.model.Comment;
 import com.learningassistant.backend.modules.order.model.Favorite;
 import com.learningassistant.backend.modules.order.repository.CommentRepository;
 import com.learningassistant.backend.modules.order.repository.FavoriteRepository;
+import com.learningassistant.backend.modules.spot.model.Spot;
+import com.learningassistant.backend.modules.spot.repository.SpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,9 @@ public class SocialService {
 
     @Autowired
     private CommentRepository commentRepository;
+    
+    @Autowired
+    private SpotRepository spotRepository;
 
     public Favorite toggleFavorite(Long userId, Long spotId) {
         Favorite exists = favoriteRepository.findByUserIdAndSpotId(userId, spotId);
@@ -45,7 +50,30 @@ public class SocialService {
         c.setContent(content);
         c.setRating(rating != null ? rating : 5);
         c.setUserName(userName);
-        return commentRepository.save(c);
+        Comment saved = commentRepository.save(c);
+        
+        // 更新景点的评分和评论数
+        updateSpotRating(spotId);
+        
+        return saved;
+    }
+    
+    /**
+     * 更新景点的评分和评论数
+     */
+    private void updateSpotRating(Long spotId) {
+        Spot spot = spotRepository.findById(spotId).orElse(null);
+        if (spot != null) {
+            // 计算平均评分
+            Double avgRating = commentRepository.calculateAverageRating(spotId);
+            spot.setRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0);
+            
+            // 统计评论数量
+            Long count = commentRepository.countBySpotIdAndParentIdIsNull(spotId);
+            spot.setCommentCount(count != null ? count.intValue() : 0);
+            
+            spotRepository.save(spot);
+        }
     }
 
     public List<Comment> listComments(Long spotId) {

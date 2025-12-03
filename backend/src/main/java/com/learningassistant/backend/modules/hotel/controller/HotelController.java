@@ -31,11 +31,28 @@ public class HotelController {
     ) {
         List<Hotel> hotels;
         
+        // 关键词搜索优先
         if (keyword != null && !keyword.isEmpty()) {
             hotels = hotelService.searchHotels(keyword);
-        } else if (regionId != null) {
+            // 如果有星级筛选，进一步过滤
             if (stars != null) {
-                hotels = hotelService.getHotelsByRegionAndStars(regionId, stars);
+                final Integer starFilter = stars;
+                hotels = hotels.stream()
+                    .filter(h -> h.getStars() != null && h.getStars().equals(starFilter))
+                    .toList();
+            }
+        } 
+        // 有地区限制
+        else if (regionId != null) {
+            if (stars != null) {
+                // 地区 + 星级 + 排序
+                if ("price".equals(sort)) {
+                    hotels = hotelService.getHotelsByRegionAndStarsOrderByPrice(regionId, stars);
+                } else if ("rating".equals(sort)) {
+                    hotels = hotelService.getHotelsByRegionAndStarsOrderByRating(regionId, stars);
+                } else {
+                    hotels = hotelService.getHotelsByRegionAndStars(regionId, stars);
+                }
             } else if (minPrice != null && maxPrice != null) {
                 hotels = hotelService.getHotelsByRegionAndPriceRange(regionId, minPrice, maxPrice);
             } else if ("rating".equals(sort)) {
@@ -45,8 +62,25 @@ public class HotelController {
             } else {
                 hotels = hotelService.getHotelsByRegion(regionId);
             }
-        } else {
-            hotels = hotelService.getAllHotels();
+        } 
+        // 无地区限制
+        else {
+            if (stars != null) {
+                // 星级 + 排序
+                if ("price".equals(sort)) {
+                    hotels = hotelService.getHotelsByStarsOrderByPrice(stars);
+                } else if ("rating".equals(sort)) {
+                    hotels = hotelService.getHotelsByStarsOrderByRating(stars);
+                } else {
+                    hotels = hotelService.getHotelsByStars(stars);
+                }
+            } else if ("price".equals(sort)) {
+                hotels = hotelService.getAllHotelsOrderByPrice();
+            } else if ("rating".equals(sort)) {
+                hotels = hotelService.getAllHotelsOrderByRating();
+            } else {
+                hotels = hotelService.getAllHotels();
+            }
         }
         
         return ResponseEntity.ok(hotels);

@@ -10,6 +10,13 @@
       <span class="deco deco-6">🌴</span>
       <span class="deco deco-7">🚂</span>
       <span class="deco deco-8">🏰</span>
+      <!-- 中间区域浮动图标 -->
+      <span class="deco deco-center-1">🎡</span>
+      <span class="deco deco-center-2">🎢</span>
+      <span class="deco deco-center-3">🏖️</span>
+      <span class="deco deco-center-4">🌸</span>
+      <span class="deco deco-center-5">🎭</span>
+      <span class="deco deco-center-6">🎪</span>
       <div class="deco-circle deco-circle-1"></div>
       <div class="deco-circle deco-circle-2"></div>
       <div class="deco-circle deco-circle-3"></div>
@@ -951,6 +958,14 @@ function goToFoodDetail(foodId: number) {
 .deco-6 { top: 35%; right: 7%; animation-delay: 2.5s; }
 .deco-7 { top: 55%; right: 4%; animation-delay: 0.8s; font-size: 30px; }
 .deco-8 { top: 75%; right: 6%; animation-delay: 1.8s; font-size: 34px; }
+
+/* 中间区域浮动图标 */
+.deco-center-1 { top: 18%; left: 30%; animation-delay: 0.3s; font-size: 28px; }
+.deco-center-2 { top: 32%; left: 65%; animation-delay: 1.2s; font-size: 32px; }
+.deco-center-3 { top: 48%; left: 40%; animation-delay: 2.2s; font-size: 26px; }
+.deco-center-4 { top: 62%; left: 55%; animation-delay: 0.7s; font-size: 30px; }
+.deco-center-5 { top: 78%; left: 35%; animation-delay: 1.6s; font-size: 28px; }
+.deco-center-6 { top: 85%; left: 60%; animation-delay: 2.8s; font-size: 24px; }
 
 /* 装饰圆圈 */
 .deco-circle {

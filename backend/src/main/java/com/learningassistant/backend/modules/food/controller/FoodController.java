@@ -100,6 +100,10 @@ public class FoodController {
         comment.setContent(req.getContent());
         
         FoodComment saved = foodCommentRepository.save(comment);
+        
+        // 更新美食的评分和评论数
+        foodService.updateFoodRating(foodId);
+        
         return ResponseEntity.ok(saved);
     }
     

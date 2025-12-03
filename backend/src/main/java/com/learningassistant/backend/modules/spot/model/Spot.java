@@ -36,4 +36,12 @@ public class Spot {
 
     @Column(columnDefinition = "text")
     private String imageUrl;
+    
+    // 评分（根据用户评论动态计算）
+    @Column(columnDefinition = "DOUBLE PRECISION DEFAULT 0")
+    private Double rating = 0.0;
+    
+    // 评论数量
+    @Column(columnDefinition = "INTEGER DEFAULT 0")
+    private Integer commentCount = 0;
 }

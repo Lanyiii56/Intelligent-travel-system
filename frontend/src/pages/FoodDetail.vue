@@ -72,11 +72,11 @@
       <!-- 评论区 -->
       <div class="comments-section">
         <div class="section-header">
-          <h2>💬 用户评价 ({{ comments.length }})</h2>
-          <div class="rating-summary" v-if="comments.length > 0">
+          <h2>💬 用户评价 ({{ commentCount }})</h2>
+          <div class="rating-summary" v-if="commentCount > 0">
             <span class="avg-rating">{{ averageRating }}</span>
             <span class="avg-star">⭐</span>
-            <span class="rating-count">{{ comments.length }} 条评价</span>
+            <span class="rating-count">{{ commentCount }} 条评价</span>
           </div>
         </div>
         
@@ -325,11 +325,24 @@ const foodTags = computed(() => {
   return food.value.tags.split(',').filter((t: string) => t.trim());
 });
 
-// 平均评分
+// 平均评分（优先使用后端计算的评分）
 const averageRating = computed(() => {
+  // 如果后端返回了评分，直接使用
+  if (food.value?.rating && food.value.rating > 0) {
+    return food.value.rating.toFixed(1);
+  }
+  // 否则从评论列表计算
   if (comments.value.length === 0) return '0.0';
   const sum = comments.value.reduce((acc, c) => acc + (c.rating || 0), 0);
   return (sum / comments.value.length).toFixed(1);
+});
+
+// 评论数量（优先使用后端返回的数量）
+const commentCount = computed(() => {
+  if (food.value?.commentCount !== undefined && food.value.commentCount !== null) {
+    return food.value.commentCount;
+  }
+  return comments.value.length;
 });
 
 // 好评（4-5星）

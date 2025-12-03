@@ -113,27 +113,329 @@
       </div>
     </div>
 
-    <!-- 编辑资料弹窗 -->
-    <el-dialog v-model="showEditProfile" title="编辑资料" width="400px">
-      <el-form :model="editForm" label-width="80px">
+    <!-- 头像上传弹窗 -->
+    <el-dialog v-model="showAvatarUpload" title="更换头像" width="450px" class="avatar-dialog">
+      <div class="avatar-upload-content">
+        <div class="current-avatar">
+          <img v-if="previewAvatar || authStore.avatar" :src="previewAvatar || authStore.avatar" alt="当前头像" />
+          <span v-else class="avatar-placeholder">{{ authStore.nickname?.charAt(0) || '游' }}</span>
+        </div>
+        <div class="avatar-options">
+          <div class="upload-section">
+            <input 
+              type="file" 
+              ref="avatarInput" 
+              accept="image/*" 
+              @change="handleAvatarSelect" 
+              style="display: none"
+            />
+            <button class="upload-btn" @click="$refs.avatarInput.click()">
+              📁 选择图片
+            </button>
+            <p class="upload-tip">支持 JPG、PNG 格式，大小不超过 2MB</p>
+          </div>
+          <div class="preset-avatars">
+            <p class="preset-title">或选择预设头像</p>
+            <div class="preset-grid">
+              <img 
+                v-for="(avatar, index) in presetAvatars" 
+                :key="index"
+                :src="avatar"
+                :class="{ selected: previewAvatar === avatar }"
+                @click="selectPresetAvatar(avatar)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="cancelAvatarUpload">取消</el-button>
+        <el-button type="primary" @click="saveAvatar" :loading="avatarUploading">保存头像</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑资料弹窗 - 增强版 -->
+    <el-dialog v-model="showEditProfile" title="编辑资料" width="500px" class="edit-profile-dialog">
+      <el-form :model="editForm" label-width="90px" class="edit-form">
+        <el-divider content-position="left">基本信息</el-divider>
         <el-form-item label="昵称">
-          <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
-        </el-form-item>
-        <el-form-item label="年龄">
-          <el-input-number v-model="editForm.age" :min="1" :max="120" />
+          <el-input v-model="editForm.nickname" placeholder="请输入昵称" maxlength="20" show-word-limit />
         </el-form-item>
         <el-form-item label="性别">
           <el-radio-group v-model="editForm.gender">
-            <el-radio value="male">男</el-radio>
-            <el-radio value="female">女</el-radio>
-            <el-radio value="other">保密</el-radio>
+            <el-radio value="male">👨 男</el-radio>
+            <el-radio value="female">👩 女</el-radio>
+            <el-radio value="other">🧑 保密</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item label="生日">
+          <el-date-picker 
+            v-model="editForm.birthday" 
+            type="date" 
+            placeholder="选择生日"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            :disabled-date="disabledDate"
+          />
+        </el-form-item>
+        <el-form-item label="所在地">
+          <el-cascader
+            v-model="editForm.location"
+            :options="locationOptions"
+            placeholder="选择所在地"
+            clearable
+          />
+        </el-form-item>
+        
+        <el-divider content-position="left">个人介绍</el-divider>
+        <el-form-item label="座右铭">
+          <el-input 
+            v-model="editForm.motto" 
+            type="textarea" 
+            :rows="2" 
+            placeholder="一句话介绍自己" 
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="个人简介">
+          <el-input 
+            v-model="editForm.bio" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="详细介绍一下自己吧" 
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+        
+        <el-divider content-position="left">联系方式</el-divider>
+        <el-form-item label="手机号">
+          <el-input v-model="editForm.phone" placeholder="请输入手机号">
+            <template #prefix>📱</template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" placeholder="请输入邮箱">
+            <template #prefix>📧</template>
+          </el-input>
+        </el-form-item>
+        
+        <el-divider content-position="left">旅行偏好</el-divider>
+        <el-form-item label="旅行风格">
+          <el-checkbox-group v-model="editForm.travelStyles">
+            <el-checkbox value="adventure">🏔️ 探险</el-checkbox>
+            <el-checkbox value="relax">🏖️ 休闲</el-checkbox>
+            <el-checkbox value="culture">🏛️ 文化</el-checkbox>
+            <el-checkbox value="food">🍜 美食</el-checkbox>
+            <el-checkbox value="photography">📷 摄影</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="常用交通">
+          <el-select v-model="editForm.preferredTransport" placeholder="选择偏好交通方式">
+            <el-option value="flight" label="✈️ 飞机" />
+            <el-option value="train" label="🚄 高铁" />
+            <el-option value="car" label="🚗 自驾" />
+            <el-option value="bus" label="🚌 大巴" />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showEditProfile = false">取消</el-button>
-        <el-button type="primary" @click="saveProfile">保存</el-button>
+        <el-button type="primary" @click="saveProfile" :loading="profileSaving">保存资料</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 设置弹窗 -->
+    <el-dialog v-model="showSettings" title="设置" width="500px" class="settings-dialog">
+      <div class="settings-content">
+        <!-- 账号安全 -->
+        <div class="settings-section">
+          <h3 class="section-title">🔐 账号安全</h3>
+          <div class="settings-item" @click="showChangePassword = true">
+            <div class="item-left">
+              <span class="item-icon">🔑</span>
+              <span class="item-label">修改密码</span>
+            </div>
+            <span class="item-arrow">›</span>
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">📱</span>
+              <span class="item-label">绑定手机</span>
+            </div>
+            <span class="item-value">{{ editForm.phone || '未绑定' }}</span>
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">📧</span>
+              <span class="item-label">绑定邮箱</span>
+            </div>
+            <span class="item-value">{{ editForm.email || '未绑定' }}</span>
+          </div>
+        </div>
+
+        <!-- 隐私设置 -->
+        <div class="settings-section">
+          <h3 class="section-title">🛡️ 隐私设置</h3>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">👁️</span>
+              <span class="item-label">公开个人主页</span>
+            </div>
+            <el-switch v-model="privacySettings.publicProfile" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">📍</span>
+              <span class="item-label">显示所在地</span>
+            </div>
+            <el-switch v-model="privacySettings.showLocation" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">❤️</span>
+              <span class="item-label">公开收藏列表</span>
+            </div>
+            <el-switch v-model="privacySettings.publicFavorites" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">🗺️</span>
+              <span class="item-label">公开行程记录</span>
+            </div>
+            <el-switch v-model="privacySettings.publicItineraries" />
+          </div>
+        </div>
+
+        <!-- 通知设置 -->
+        <div class="settings-section">
+          <h3 class="section-title">🔔 通知设置</h3>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">💬</span>
+              <span class="item-label">私信通知</span>
+            </div>
+            <el-switch v-model="notificationSettings.message" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">👥</span>
+              <span class="item-label">新粉丝通知</span>
+            </div>
+            <el-switch v-model="notificationSettings.newFollower" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">📢</span>
+              <span class="item-label">系统公告</span>
+            </div>
+            <el-switch v-model="notificationSettings.systemNotice" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">🎁</span>
+              <span class="item-label">优惠活动</span>
+            </div>
+            <el-switch v-model="notificationSettings.promotion" />
+          </div>
+        </div>
+
+        <!-- 其他设置 -->
+        <div class="settings-section">
+          <h3 class="section-title">⚙️ 其他</h3>
+          <div class="settings-item" @click="clearCache">
+            <div class="item-left">
+              <span class="item-icon">🗑️</span>
+              <span class="item-label">清除缓存</span>
+            </div>
+            <span class="item-value">{{ cacheSize }}</span>
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">🌙</span>
+              <span class="item-label">深色模式</span>
+            </div>
+            <el-switch v-model="otherSettings.darkMode" @change="toggleDarkMode" />
+          </div>
+          <div class="settings-item">
+            <div class="item-left">
+              <span class="item-icon">📖</span>
+              <span class="item-label">版本信息</span>
+            </div>
+            <span class="item-value">v1.0.0</span>
+          </div>
+          <div class="settings-item" @click="showAbout = true">
+            <div class="item-left">
+              <span class="item-icon">ℹ️</span>
+              <span class="item-label">关于我们</span>
+            </div>
+            <span class="item-arrow">›</span>
+          </div>
+        </div>
+
+        <!-- 危险操作 -->
+        <div class="settings-section danger-section">
+          <h3 class="section-title">⚠️ 危险操作</h3>
+          <div class="settings-item danger" @click="confirmLogout">
+            <div class="item-left">
+              <span class="item-icon">🚪</span>
+              <span class="item-label">退出登录</span>
+            </div>
+            <span class="item-arrow">›</span>
+          </div>
+          <div class="settings-item danger" @click="confirmDeleteAccount">
+            <div class="item-left">
+              <span class="item-icon">💀</span>
+              <span class="item-label">注销账号</span>
+            </div>
+            <span class="item-arrow">›</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showSettings = false">关闭</el-button>
+        <el-button type="primary" @click="saveSettings">保存设置</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 修改密码弹窗 -->
+    <el-dialog v-model="showChangePassword" title="修改密码" width="400px">
+      <el-form :model="passwordForm" label-width="100px">
+        <el-form-item label="当前密码">
+          <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码" show-password />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" show-password />
+        </el-form-item>
+        <el-form-item label="确认新密码">
+          <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showChangePassword = false">取消</el-button>
+        <el-button type="primary" @click="changePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 关于我们弹窗 -->
+    <el-dialog v-model="showAbout" title="关于我们" width="400px">
+      <div class="about-content">
+        <div class="about-logo">🌍</div>
+        <h2>智能旅游系统</h2>
+        <p class="about-version">版本 1.0.0</p>
+        <p class="about-desc">
+          智能旅游系统是一款基于 AI 的旅行规划助手，
+          帮助您轻松规划完美的旅行行程。
+        </p>
+        <div class="about-features">
+          <div class="feature-item">🗺️ 智能行程规划</div>
+          <div class="feature-item">🏨 酒店预订</div>
+          <div class="feature-item">🍜 美食推荐</div>
+          <div class="feature-item">👥 社交互动</div>
+        </div>
+        <p class="about-copyright">© 2024 智能旅游系统团队</p>
+      </div>
     </el-dialog>
 
     <!-- 内容区域 -->
@@ -304,6 +606,13 @@ const loading = ref(true);
 const showEditProfile = ref(false);
 const showSettings = ref(false);
 const showAvatarUpload = ref(false);
+const showChangePassword = ref(false);
+const showAbout = ref(false);
+const profileSaving = ref(false);
+const avatarUploading = ref(false);
+const previewAvatar = ref('');
+const avatarInput = ref<HTMLInputElement | null>(null);
+const cacheSize = ref('2.3 MB');
 
 // 社交相关状态
 const followStats = ref({ following: 0, followers: 0 });
@@ -311,6 +620,97 @@ const showFollowModal = ref(false);
 const followModalType = ref<'following' | 'followers'>('following');
 const followList = ref<any[]>([]);
 const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png';
+
+// 预设头像列表
+const presetAvatars = [
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Felix',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Aneka',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Bailey',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Coco',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Daisy',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Eliza',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Ginger',
+  'https://api.dicebear.com/7.x/adventurer/svg?seed=Harley',
+];
+
+// 隐私设置
+const privacySettings = reactive({
+  publicProfile: true,
+  showLocation: true,
+  publicFavorites: true,
+  publicItineraries: false,
+});
+
+// 通知设置
+const notificationSettings = reactive({
+  message: true,
+  newFollower: true,
+  systemNotice: true,
+  promotion: false,
+});
+
+// 其他设置
+const otherSettings = reactive({
+  darkMode: false,
+});
+
+// 密码表单
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+});
+
+// 地区选项
+const locationOptions = [
+  {
+    value: 'beijing',
+    label: '北京',
+    children: [{ value: 'beijing', label: '北京市' }]
+  },
+  {
+    value: 'shanghai',
+    label: '上海',
+    children: [{ value: 'shanghai', label: '上海市' }]
+  },
+  {
+    value: 'sichuan',
+    label: '四川',
+    children: [
+      { value: 'chengdu', label: '成都市' },
+      { value: 'bindingmianyang', label: '绵阳市' },
+      { value: 'yibin', label: '宜宾市' },
+      { value: 'leshan', label: '乐山市' },
+    ]
+  },
+  {
+    value: 'zhejiang',
+    label: '浙江',
+    children: [
+      { value: 'hangzhou', label: '杭州市' },
+      { value: 'ningbo', label: '宁波市' },
+      { value: 'wenzhou', label: '温州市' },
+    ]
+  },
+  {
+    value: 'guangdong',
+    label: '广东',
+    children: [
+      { value: 'guangzhou', label: '广州市' },
+      { value: 'shenzhen', label: '深圳市' },
+      { value: 'zhuhai', label: '珠海市' },
+    ]
+  },
+  {
+    value: 'jiangsu',
+    label: '江苏',
+    children: [
+      { value: 'nanjing', label: '南京市' },
+      { value: 'suzhou', label: '苏州市' },
+      { value: 'wuxi', label: '无锡市' },
+    ]
+  },
+];
 
 // 用户座右铭
 const mottos = [
@@ -359,8 +759,21 @@ const unlockedAchievements = computed(() => achievements.value.filter(a => a.unl
 const editForm = reactive({
   nickname: '',
   age: undefined as number | undefined,
-  gender: ''
+  gender: '',
+  birthday: '',
+  location: [] as string[],
+  motto: '',
+  bio: '',
+  phone: '',
+  email: '',
+  travelStyles: [] as string[],
+  preferredTransport: '',
 });
+
+// 禁用未来日期
+function disabledDate(time: Date) {
+  return time.getTime() > Date.now();
+}
 
 onMounted(async () => {
   // 初始化编辑表单
@@ -432,6 +845,7 @@ function handleLogout() {
 }
 
 async function saveProfile() {
+  profileSaving.value = true;
   try {
     const userId = authStore.user?.id;
     if (!userId) {
@@ -443,18 +857,38 @@ async function saveProfile() {
     await updateProfileApi(userId, {
       nickname: editForm.nickname,
       age: editForm.age,
-      gender: editForm.gender
+      gender: editForm.gender,
+      birthday: editForm.birthday,
+      location: editForm.location?.join('/'),
+      motto: editForm.motto,
+      bio: editForm.bio,
+      phone: editForm.phone,
+      email: editForm.email,
     });
     
     // 更新本地状态
     await authStore.updateProfile({
-      nickname: editForm.nickname
+      nickname: editForm.nickname,
+      motto: editForm.motto,
     });
+    
+    // 保存旅行偏好到本地
+    localStorage.setItem('travel_preferences', JSON.stringify({
+      travelStyles: editForm.travelStyles,
+      preferredTransport: editForm.preferredTransport,
+    }));
+    
+    // 更新座右铭显示
+    if (editForm.motto) {
+      userMotto.value = editForm.motto;
+    }
     
     ElMessage.success('资料已更新');
     showEditProfile.value = false;
   } catch (e) {
     ElMessage.error('更新失败');
+  } finally {
+    profileSaving.value = false;
   }
 }
 
@@ -579,6 +1013,200 @@ function startChat(userId: number) {
   closeFollowModal();
   router.push(`/chat/${userId}`);
 }
+
+// ==================== 头像相关方法 ====================
+
+// 选择头像文件
+function handleAvatarSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    
+    // 检查文件大小
+    if (file.size > 2 * 1024 * 1024) {
+      ElMessage.error('图片大小不能超过 2MB');
+      return;
+    }
+    
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      ElMessage.error('请选择图片文件');
+      return;
+    }
+    
+    // 预览图片
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewAvatar.value = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// 选择预设头像
+function selectPresetAvatar(avatar: string) {
+  previewAvatar.value = avatar;
+}
+
+// 取消头像上传
+function cancelAvatarUpload() {
+  showAvatarUpload.value = false;
+  previewAvatar.value = '';
+}
+
+// 保存头像
+async function saveAvatar() {
+  if (!previewAvatar.value) {
+    ElMessage.warning('请先选择头像');
+    return;
+  }
+  
+  avatarUploading.value = true;
+  try {
+    // 更新头像到 store
+    await authStore.updateProfile({
+      avatar: previewAvatar.value
+    });
+    
+    ElMessage.success('头像更新成功');
+    showAvatarUpload.value = false;
+    previewAvatar.value = '';
+  } catch (e) {
+    ElMessage.error('头像更新失败');
+  } finally {
+    avatarUploading.value = false;
+  }
+}
+
+// ==================== 设置相关方法 ====================
+
+// 保存设置
+function saveSettings() {
+  // 保存到本地存储
+  localStorage.setItem('privacy_settings', JSON.stringify(privacySettings));
+  localStorage.setItem('notification_settings', JSON.stringify(notificationSettings));
+  localStorage.setItem('other_settings', JSON.stringify(otherSettings));
+  
+  ElMessage.success('设置已保存');
+  showSettings.value = false;
+}
+
+// 清除缓存
+function clearCache() {
+  ElMessageBox.confirm('确定要清除所有缓存数据吗？', '清除缓存', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    // 清除本地存储（保留登录信息）
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    localStorage.clear();
+    if (token) localStorage.setItem('token', token);
+    if (user) localStorage.setItem('user', user);
+    
+    cacheSize.value = '0 KB';
+    ElMessage.success('缓存已清除');
+  }).catch(() => {});
+}
+
+// 切换深色模式
+function toggleDarkMode(value: boolean) {
+  if (value) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+  localStorage.setItem('dark_mode', String(value));
+}
+
+// 确认退出登录
+function confirmLogout() {
+  ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
+    confirmButtonText: '确定退出',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    handleLogout();
+  }).catch(() => {});
+}
+
+// 确认注销账号
+function confirmDeleteAccount() {
+  ElMessageBox.confirm(
+    '注销账号后，您的所有数据将被永久删除且无法恢复。确定要注销吗？',
+    '注销账号',
+    {
+      confirmButtonText: '确定注销',
+      cancelButtonText: '取消',
+      type: 'error',
+      confirmButtonClass: 'el-button--danger'
+    }
+  ).then(() => {
+    ElMessage.info('账号注销功能暂未开放');
+  }).catch(() => {});
+}
+
+// 修改密码
+async function changePassword() {
+  if (!passwordForm.oldPassword) {
+    ElMessage.warning('请输入当前密码');
+    return;
+  }
+  if (!passwordForm.newPassword) {
+    ElMessage.warning('请输入新密码');
+    return;
+  }
+  if (passwordForm.newPassword.length < 6) {
+    ElMessage.warning('新密码长度至少 6 位');
+    return;
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致');
+    return;
+  }
+  
+  try {
+    // TODO: 调用后端 API 修改密码
+    ElMessage.success('密码修改成功，请重新登录');
+    showChangePassword.value = false;
+    // 清空表单
+    passwordForm.oldPassword = '';
+    passwordForm.newPassword = '';
+    passwordForm.confirmPassword = '';
+    // 退出登录
+    setTimeout(() => {
+      handleLogout();
+    }, 1500);
+  } catch (e) {
+    ElMessage.error('密码修改失败');
+  }
+}
+
+// 加载设置
+function loadSettings() {
+  // 从本地存储加载设置
+  const savedPrivacy = localStorage.getItem('privacy_settings');
+  const savedNotification = localStorage.getItem('notification_settings');
+  const savedOther = localStorage.getItem('other_settings');
+  
+  if (savedPrivacy) {
+    Object.assign(privacySettings, JSON.parse(savedPrivacy));
+  }
+  if (savedNotification) {
+    Object.assign(notificationSettings, JSON.parse(savedNotification));
+  }
+  if (savedOther) {
+    Object.assign(otherSettings, JSON.parse(savedOther));
+    // 应用深色模式
+    if (otherSettings.darkMode) {
+      document.documentElement.classList.add('dark');
+    }
+  }
+}
+
+// 初始化时加载设置
+loadSettings();
 </script>
 
 <style scoped>
@@ -1407,5 +2035,274 @@ function startChat(userId: number) {
 .empty-follow span {
   font-size: 14px;
   color: #999;
+}
+
+/* ==================== 头像上传弹窗样式 ==================== */
+.avatar-upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.current-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.current-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  font-size: 48px;
+  color: white;
+  font-weight: 700;
+}
+
+.avatar-options {
+  width: 100%;
+}
+
+.upload-section {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.upload-btn {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.upload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+.preset-avatars {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 20px;
+}
+
+.preset-title {
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.preset-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.3s;
+  background: #f5f5f5;
+}
+
+.preset-grid img:hover {
+  transform: scale(1.1);
+}
+
+.preset-grid img.selected {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== 编辑资料弹窗样式 ==================== */
+.edit-form :deep(.el-divider__text) {
+  font-size: 14px;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.edit-form :deep(.el-checkbox-group) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.edit-form :deep(.el-checkbox) {
+  margin-right: 0;
+}
+
+/* ==================== 设置弹窗样式 ==================== */
+.settings-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section .section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-item:hover {
+  background: #f0f0f0;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-icon {
+  font-size: 18px;
+}
+
+.item-label {
+  font-size: 14px;
+  color: #333;
+}
+
+.item-value {
+  font-size: 13px;
+  color: #999;
+}
+
+.item-arrow {
+  font-size: 18px;
+  color: #ccc;
+}
+
+.danger-section .settings-item.danger {
+  background: #fef2f2;
+}
+
+.danger-section .settings-item.danger:hover {
+  background: #fee2e2;
+}
+
+.danger-section .settings-item.danger .item-label {
+  color: #dc2626;
+}
+
+/* ==================== 关于我们弹窗样式 ==================== */
+.about-content {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.about-logo {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.about-content h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.about-version {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+.about-desc {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  padding: 0 20px;
+}
+
+.about-features {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.feature-item {
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 12px;
+  font-size: 14px;
+  color: #667eea;
+}
+
+.about-copyright {
+  font-size: 12px;
+  color: #999;
+}
+
+/* ==================== 深色模式样式 ==================== */
+:global(.dark) .profile-page {
+  background: #1a1a2e;
+}
+
+:global(.dark) .user-card,
+:global(.dark) .section-card,
+:global(.dark) .achievements-card {
+  background: #2d2d44;
+  color: #e0e0e0;
+}
+
+:global(.dark) .user-name,
+:global(.dark) .section-title {
+  color: #fff;
+}
+
+:global(.dark) .settings-item {
+  background: #3d3d5c;
+}
+
+:global(.dark) .settings-item:hover {
+  background: #4d4d6c;
+}
+
+:global(.dark) .item-label {
+  color: #e0e0e0;
 }
 </style>

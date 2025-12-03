@@ -14,6 +14,10 @@ export interface User {
   gender?: string;
   email?: string;
   phone?: string;
+  birthday?: string;
+  location?: string;
+  motto?: string;
+  bio?: string;
   createdAt?: string;
 }
 

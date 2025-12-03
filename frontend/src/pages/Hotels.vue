@@ -2,31 +2,58 @@
   <div class="hotels-page">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h1 class="page-title">🏨 酒店预订</h1>
+      <div class="header-decoration">
+        <span class="deco-icon deco-1">🏨</span>
+        <span class="deco-icon deco-2">🛏️</span>
+        <span class="deco-icon deco-3">🌟</span>
+        <span class="deco-icon deco-4">🔑</span>
+      </div>
+      <div class="title-wrapper">
+        <span class="title-icon">🏨</span>
+        <h1 class="page-title">酒店预订</h1>
+      </div>
       <p class="page-subtitle">精选优质酒店，让旅途更舒适</p>
+      <div class="header-tags">
+        <span class="header-tag">🌟 品质保障</span>
+        <span class="header-tag">💰 优惠价格</span>
+        <span class="header-tag">🛎️ 贴心服务</span>
+      </div>
     </div>
 
     <!-- 搜索和筛选 -->
     <div class="filter-section">
-      <div class="search-bar">
-        <input 
-          type="text" 
-          v-model="searchKeyword" 
-          placeholder="搜索酒店名称或地址..."
-          @keyup.enter="handleSearch"
-        />
-        <button class="search-btn" @click="handleSearch">🔍</button>
+      <div class="search-row">
+        <div class="city-selector">
+          <label>📍 选择城市</label>
+          <select v-model="filters.regionId" @change="loadHotels" class="city-select">
+            <option :value="undefined">全部城市</option>
+            <optgroup 
+              v-for="province in groupedRegions" 
+              :key="province.id" 
+              :label="province.name"
+            >
+              <option 
+                v-for="city in province.cities" 
+                :key="city.id" 
+                :value="city.id"
+              >
+                {{ city.name }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="search-bar">
+          <input 
+            type="text" 
+            v-model="searchKeyword" 
+            placeholder="搜索酒店名称..."
+            @keyup.enter="handleSearch"
+          />
+          <button class="search-btn" @click="handleSearch">🔍</button>
+        </div>
       </div>
       
       <div class="filter-options">
-        <select v-model="filters.regionId" @change="loadHotels">
-          <option :value="undefined">全部区域</option>
-          <option :value="1">市中心</option>
-          <option :value="2">景区周边</option>
-          <option :value="3">商业区</option>
-          <option :value="4">交通枢纽</option>
-        </select>
-        
         <select v-model="filters.stars" @change="loadHotels">
           <option :value="undefined">全部星级</option>
           <option :value="5">五星级</option>
@@ -40,6 +67,20 @@
           <option value="rating">评分最高</option>
           <option value="price">价格最低</option>
         </select>
+      </div>
+      
+      <!-- 当前筛选条件 -->
+      <div class="active-filters" v-if="filters.regionId || filters.stars">
+        <span class="filter-label">当前筛选：</span>
+        <span class="filter-tag" v-if="filters.regionId">
+          {{ getRegionName(filters.regionId) }}
+          <button @click="clearRegion">×</button>
+        </span>
+        <span class="filter-tag" v-if="filters.stars">
+          {{ filters.stars }}星级
+          <button @click="clearStars">×</button>
+        </span>
+        <button class="clear-all" @click="resetFilters">清除全部</button>
       </div>
     </div>
 
@@ -98,14 +139,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { getHotels, type Hotel, type HotelSearchParams } from '@/api/hotel';
+import { getAllRegions, type Region } from '@/api/region';
 
 const router = useRouter();
 const route = useRoute();
 
 const hotels = ref<Hotel[]>([]);
+const regions = ref<Region[]>([]);
 const loading = ref(false);
 const searchKeyword = ref('');
 const defaultImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400';
@@ -116,13 +159,52 @@ const filters = reactive<HotelSearchParams>({
   sort: undefined
 });
 
+// 将地区按省份分组
+interface GroupedRegion {
+  id: number;
+  name: string;
+  cities: Region[];
+}
+
+const groupedRegions = computed<GroupedRegion[]>(() => {
+  const provinces = regions.value.filter(r => !r.parentId);
+  return provinces.map(province => ({
+    id: province.id,
+    name: province.name,
+    cities: regions.value.filter(r => r.parentId === province.id)
+  })).filter(p => p.cities.length > 0);
+});
+
+// 获取地区名称
+function getRegionName(regionId: number | undefined): string {
+  if (!regionId) return '';
+  const region = regions.value.find(r => r.id === regionId);
+  return region ? region.name : '';
+}
+
+// 清除单个筛选
+function clearRegion() {
+  filters.regionId = undefined;
+  loadHotels();
+}
+
+function clearStars() {
+  filters.stars = undefined;
+  loadHotels();
+}
+
 // 从路由参数获取区域ID
-onMounted(() => {
+onMounted(async () => {
+  // 加载地区数据
+  try {
+    const res = await getAllRegions();
+    regions.value = res.data || [];
+  } catch (e) {
+    console.error('获取地区失败', e);
+  }
+  
   if (route.query.regionId) {
     filters.regionId = Number(route.query.regionId);
-  }
-  if (route.query.lat && route.query.lng) {
-    // 如果有经纬度参数，可以用于附近搜索
   }
   loadHotels();
 });
@@ -196,35 +278,153 @@ function parseFacilities(facilities: string): string[] {
 .page-header {
   text-align: center;
   margin-bottom: 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  border-radius: 24px;
+  padding: 48px 24px 40px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+}
+
+/* 装饰浮动图标 */
+.header-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.deco-icon {
+  position: absolute;
+  font-size: 24px;
+  opacity: 0.2;
+  animation: float 4s ease-in-out infinite;
+}
+
+.deco-1 { top: 15%; left: 10%; animation-delay: 0s; font-size: 28px; }
+.deco-2 { top: 25%; right: 12%; animation-delay: 1s; font-size: 22px; }
+.deco-3 { bottom: 20%; left: 15%; animation-delay: 0.5s; font-size: 26px; }
+.deco-4 { bottom: 25%; right: 10%; animation-delay: 1.5s; font-size: 20px; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+}
+
+.title-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.title-icon {
+  font-size: 48px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 .page-title {
-  font-size: 32px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 8px;
+  font-size: 42px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  letter-spacing: 4px;
+  margin: 0;
 }
 
 .page-subtitle {
-  color: #666;
-  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.header-tags {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-tag {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.header-tag:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 /* 筛选区域 */
 .filter-section {
   background: white;
   border-radius: 16px;
-  padding: 20px 24px;
+  padding: 24px;
   margin-bottom: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
+.search-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: flex-end;
+}
+
+.city-selector {
+  flex: 0 0 240px;
+}
+
+.city-selector label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.city-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #667eea;
+  border-radius: 12px;
+  font-size: 15px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.city-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+}
+
+.city-select:hover {
+  border-color: #764ba2;
+}
+
 .search-bar {
+  flex: 1;
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .search-bar input {
@@ -255,6 +455,68 @@ function parseFacilities(facilities: string): string[] {
 .search-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 当前筛选条件 */
+.active-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filter-tag button {
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  color: white;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.filter-tag button:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.clear-all {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-all:hover {
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .filter-options {

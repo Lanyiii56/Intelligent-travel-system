@@ -60,7 +60,7 @@
               <div class="spot-rating-badge" v-if="avgRating > 0">
                 <span class="rating-star">⭐</span>
                 <span class="rating-value">{{ avgRating.toFixed(1) }}</span>
-                <span class="rating-count">({{ comments.length }}条评价)</span>
+                <span class="rating-count">({{ commentCount }}条评价)</span>
               </div>
             </div>
             <div class="spot-meta">
@@ -347,11 +347,24 @@ const currentImage = computed(() => {
   return allImages.value[currentImageIndex.value] || spot.value?.imageUrl;
 });
 
-// 平均评分
+// 平均评分（优先使用后端计算的评分）
 const avgRating = computed(() => {
+  // 如果后端返回了评分，直接使用
+  if (spot.value?.rating && spot.value.rating > 0) {
+    return spot.value.rating;
+  }
+  // 否则从评论列表计算
   if (comments.value.length === 0) return 0;
   const sum = comments.value.reduce((acc, c) => acc + (c.rating || 5), 0);
   return sum / comments.value.length;
+});
+
+// 评论数量（优先使用后端返回的数量）
+const commentCount = computed(() => {
+  if (spot.value?.commentCount !== undefined && spot.value.commentCount !== null) {
+    return spot.value.commentCount;
+  }
+  return comments.value.length;
 });
 
 // 排序后的评论

@@ -2,6 +2,7 @@ package com.learningassistant.backend.modules.food.service;
 
 import com.learningassistant.backend.modules.food.model.Food;
 import com.learningassistant.backend.modules.food.repository.FoodRepository;
+import com.learningassistant.backend.modules.food.repository.FoodCommentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,9 @@ public class FoodService {
 
     @Autowired
     private FoodRepository foodRepository;
+    
+    @Autowired
+    private FoodCommentRepository foodCommentRepository;
 
     /**
      * 获取所有美食
@@ -92,5 +96,23 @@ public class FoodService {
      */
     public void deleteById(Long id) {
         foodRepository.deleteById(id);
+    }
+    
+    /**
+     * 更新美食的评分和评论数
+     */
+    public void updateFoodRating(Long foodId) {
+        Food food = foodRepository.findById(foodId).orElse(null);
+        if (food != null) {
+            // 计算平均评分
+            Double avgRating = foodCommentRepository.calculateAverageRating(foodId);
+            food.setRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0);
+            
+            // 统计评论数量
+            Long count = foodCommentRepository.countTopLevelComments(foodId);
+            food.setCommentCount(count != null ? count.intValue() : 0);
+            
+            foodRepository.save(food);
+        }
     }
 }

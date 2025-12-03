@@ -52,6 +52,26 @@ public class HotelService {
     public List<Hotel> getHotelsByRegionAndStars(Integer regionId, Integer stars) {
         return hotelRepository.findByRegionIdAndStars(regionId, stars);
     }
+    
+    public List<Hotel> getHotelsByRegionAndStarsOrderByPrice(Integer regionId, Integer stars) {
+        return hotelRepository.findByRegionIdAndStarsOrderByPriceMinAsc(regionId, stars);
+    }
+    
+    public List<Hotel> getHotelsByRegionAndStarsOrderByRating(Integer regionId, Integer stars) {
+        return hotelRepository.findByRegionIdAndStarsOrderByRatingDesc(regionId, stars);
+    }
+    
+    public List<Hotel> getHotelsByStars(Integer stars) {
+        return hotelRepository.findByStars(stars);
+    }
+    
+    public List<Hotel> getHotelsByStarsOrderByPrice(Integer stars) {
+        return hotelRepository.findByStarsOrderByPriceMinAsc(stars);
+    }
+    
+    public List<Hotel> getHotelsByStarsOrderByRating(Integer stars) {
+        return hotelRepository.findByStarsOrderByRatingDesc(stars);
+    }
 
     public List<Hotel> getHotelsByRegionOrderByRating(Integer regionId) {
         return hotelRepository.findByRegionIdOrderByRatingDesc(regionId);
@@ -59,6 +79,14 @@ public class HotelService {
 
     public List<Hotel> getHotelsByRegionOrderByPrice(Integer regionId) {
         return hotelRepository.findByRegionIdOrderByPriceMinAsc(regionId);
+    }
+    
+    public List<Hotel> getAllHotelsOrderByPrice() {
+        return hotelRepository.findAllByOrderByPriceMinAsc();
+    }
+    
+    public List<Hotel> getAllHotelsOrderByRating() {
+        return hotelRepository.findAllByOrderByRatingDesc();
     }
 
     /**
