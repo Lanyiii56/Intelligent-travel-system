@@ -33,6 +33,10 @@
             <span class="nav-icon">🏞️</span>
             <span>景点</span>
           </router-link>
+          <router-link to="/hotels" class="nav-link">
+            <span class="nav-icon">🏨</span>
+            <span>酒店</span>
+          </router-link>
           <router-link to="/smart-recommend" class="nav-link">
             <span class="nav-icon">✨</span>
             <span>推荐</span>

@@ -195,6 +195,15 @@
                     <span class="tag time">{{ spot.playTime }}分钟</span>
                     <span class="tag price" v-if="spot.priceMax">¥{{ spot.priceMin }}-{{ spot.priceMax }}</span>
                   </div>
+                  <a 
+                    v-if="spot.longitude && spot.latitude"
+                    :href="`https://uri.amap.com/marker?position=${spot.longitude},${spot.latitude}&name=${encodeURIComponent(spot.name)}`"
+                    target="_blank"
+                    class="nav-btn-small"
+                    @click.stop
+                  >
+                    🧭 导航
+                  </a>
                 </div>
               </div>
               <!-- 交通信息（AI 推荐时显示详细信息） -->
@@ -272,6 +281,43 @@
               <span>总计</span>
               <span class="total-amount">¥{{ result.cost.totalCost }}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 路线地图 -->
+      <div class="route-map-panel">
+        <h3 class="panel-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          路线地图
+          <a 
+            v-if="result.spots.length > 0"
+            :href="getRouteNavUrl()"
+            target="_blank"
+            class="nav-all-btn"
+          >
+            🗺️ 在高德地图中查看完整路线
+          </a>
+        </h3>
+        <div class="map-container">
+          <div id="route-map" class="route-map"></div>
+        </div>
+        <div class="map-legend">
+          <div class="legend-item" v-for="(spot, index) in result.spots" :key="spot.id">
+            <span class="legend-number">{{ index + 1 }}</span>
+            <span class="legend-name">{{ spot.name }}</span>
+            <a 
+              v-if="spot.longitude && spot.latitude"
+              :href="`https://uri.amap.com/marker?position=${spot.longitude},${spot.latitude}&name=${encodeURIComponent(spot.name)}`"
+              target="_blank"
+              class="legend-nav"
+              @click.stop
+            >
+              导航
+            </a>
           </div>
         </div>
       </div>
@@ -364,6 +410,7 @@ import { getAllRegions, type Region } from '@/api/region';
 import { recommendFoods, type Food } from '@/api/food';
 import TravelMap from '@/components/TravelMap.vue';
 import { useAuthStore } from '@/modules/auth/store';
+import { AMAP_CONFIG } from '@/config/amap';
 
 // 组件名称，用于 keep-alive 缓存
 defineOptions({
@@ -571,6 +618,9 @@ async function onRecommend() {
 
     if (result.value?.spots.length === 0) {
       ElMessage.info('未找到符合条件的景点，请调整筛选条件');
+    } else {
+      // 初始化路线地图
+      initRouteMap();
     }
   } catch (e) {
     console.error(e);
@@ -593,6 +643,138 @@ function formatTime(minutes: number): string {
 
 function goToSpot(id: number) {
   router.push(`/spots/${id}`);
+}
+
+// ==================== 地图相关 ====================
+let routeMap: any = null;
+
+// 生成完整路线导航链接
+function getRouteNavUrl(): string {
+  if (!result.value?.spots.length) return '';
+  
+  const spots = result.value.spots.filter(s => s.longitude && s.latitude);
+  if (spots.length === 0) return '';
+  
+  // 高德地图路线规划 URL
+  // 格式: https://uri.amap.com/navigation?from=lng,lat,name&to=lng,lat,name&via=lng,lat,name
+  const from = spots[0];
+  const to = spots[spots.length - 1];
+  
+  let url = `https://uri.amap.com/navigation?from=${from.longitude},${from.latitude},${encodeURIComponent(from.name)}&to=${to.longitude},${to.latitude},${encodeURIComponent(to.name)}`;
+  
+  // 添加途经点
+  if (spots.length > 2) {
+    const via = spots.slice(1, -1).map(s => `${s.longitude},${s.latitude},${encodeURIComponent(s.name)}`).join(';');
+    url += `&via=${via}`;
+  }
+  
+  url += '&mode=car&callnative=1';
+  return url;
+}
+
+// 初始化路线地图
+function initRouteMap() {
+  if (!result.value?.spots.length) return;
+  
+  const spots = result.value.spots.filter(s => s.longitude && s.latitude);
+  if (spots.length === 0) return;
+  
+  // 延迟执行确保 DOM 已渲染
+  setTimeout(() => {
+    if (!window.AMap) {
+      loadAMapScript().then(() => createRouteMap(spots));
+    } else {
+      createRouteMap(spots);
+    }
+  }, 200);
+}
+
+function loadAMapScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.AMap) {
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Marker,AMap.InfoWindow,AMap.Polyline`;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('高德地图加载失败'));
+    document.head.appendChild(script);
+  });
+}
+
+function createRouteMap(spots: any[]) {
+  const container = document.getElementById('route-map');
+  if (!container || !window.AMap) return;
+  
+  // 计算地图中心点
+  const lngs = spots.map(s => s.longitude);
+  const lats = spots.map(s => s.latitude);
+  const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  
+  // 创建地图
+  routeMap = new window.AMap.Map('route-map', {
+    zoom: 13,
+    center: [centerLng, centerLat],
+    viewMode: '2D'
+  });
+  
+  // 添加标记点
+  const markers: any[] = [];
+  spots.forEach((spot, index) => {
+    const marker = new window.AMap.Marker({
+      position: [spot.longitude, spot.latitude],
+      title: spot.name,
+      label: {
+        content: `<div style="background:#667eea;color:white;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:bold;">${index + 1}</div>`,
+        offset: new window.AMap.Pixel(-12, -35)
+      }
+    });
+    
+    // 信息窗口
+    const infoWindow = new window.AMap.InfoWindow({
+      content: `
+        <div style="padding: 8px;">
+          <h4 style="margin: 0 0 5px 0; font-size: 14px;">${index + 1}. ${spot.name}</h4>
+          <p style="margin: 0; color: #666; font-size: 12px;">${spot.reason || ''}</p>
+        </div>
+      `,
+      offset: new window.AMap.Pixel(0, -30)
+    });
+    
+    marker.on('click', () => {
+      infoWindow.open(routeMap, marker.getPosition());
+    });
+    
+    markers.push(marker);
+    routeMap.add(marker);
+  });
+  
+  // 绘制路线连接线
+  if (spots.length > 1) {
+    const path = spots.map(s => [s.longitude, s.latitude]);
+    const polyline = new window.AMap.Polyline({
+      path: path,
+      strokeColor: '#667eea',
+      strokeWeight: 4,
+      strokeOpacity: 0.8,
+      strokeStyle: 'solid',
+      lineJoin: 'round'
+    });
+    routeMap.add(polyline);
+  }
+  
+  // 自动调整视野
+  routeMap.setFitView(markers);
+}
+
+// 声明全局 AMap 类型
+declare global {
+  interface Window {
+    AMap: any;
+  }
 }
 
 // 获取交通方式图标
@@ -1855,6 +2037,152 @@ function goToFoodDetail(foodId: number) {
   
   .stats-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 导航按钮样式 */
+.nav-btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  transition: all 0.3s;
+}
+
+.nav-btn-small:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* 路线地图面板 */
+.route-map-panel {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.route-map-panel .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nav-all-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.nav-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.map-container {
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.route-map {
+  width: 100%;
+  height: 350px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+}
+
+.route-map:empty::before {
+  content: '🗺️ 地图加载中...';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 16px;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.legend-number {
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.legend-name {
+  color: #333;
+  font-weight: 500;
+}
+
+.legend-nav {
+  color: #667eea;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.legend-nav:hover {
+  background: rgba(102, 126, 234, 0.2);
+}
+
+@media (max-width: 768px) {
+  .route-map {
+    height: 280px;
+  }
+  
+  .nav-all-btn {
+    margin-left: 0;
+    margin-top: 10px;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .route-map-panel .panel-title {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

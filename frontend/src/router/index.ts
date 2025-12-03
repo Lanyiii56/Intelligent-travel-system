@@ -13,6 +13,7 @@ import spotRoutes from '@/modules/spot/routes'
 import recommendRoutes from '@/modules/recommend/routes'
 import orderRoutes from '@/modules/order/routes'
 import messageRoutes from '@/modules/message/routes'
+import hotelRoutes from '@/modules/hotel/routes'
 
 // 合并所有路由
 const routes = [
@@ -21,6 +22,7 @@ const routes = [
   ...recommendRoutes,  // 成员3: 推荐、智能推荐
   ...orderRoutes,      // 成员4: 预订、收藏
   ...messageRoutes,    // 社交模块: 消息、聊天
+  ...hotelRoutes,      // 酒店模块: 酒店列表、详情、预订
 ]
 
 const router = createRouter({
