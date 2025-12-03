@@ -193,11 +193,16 @@
           <div v-for="comment in filteredComments" :key="comment.id" class="comment-item">
             <div class="comment-header">
               <div class="comment-user">
-                <div class="user-avatar" :style="{ background: getAvatarColor(comment.userName) }">
+                <div 
+                  class="user-avatar clickable" 
+                  :style="{ background: getAvatarColor(comment.userName) }"
+                  @click="goToUserProfile(comment.userId)"
+                  title="查看用户主页"
+                >
                   {{ comment.userName?.charAt(0) || '游' }}
                 </div>
                 <div class="user-info">
-                  <span class="user-name">{{ comment.userName || '匿名用户' }}</span>
+                  <span class="user-name clickable" @click="goToUserProfile(comment.userId)">{{ comment.userName || '匿名用户' }}</span>
                   <span class="comment-time">{{ formatDate(comment.createdAt) }}</span>
                 </div>
               </div>
@@ -236,12 +241,17 @@
               </button>
               <div v-show="expandedReplies.has(comment.id)" class="replies-list">
                 <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
-                  <div class="reply-avatar" :style="{ background: getAvatarColor(reply.userName) }">
+                  <div 
+                    class="reply-avatar clickable" 
+                    :style="{ background: getAvatarColor(reply.userName) }"
+                    @click="goToUserProfile(reply.userId)"
+                    title="查看用户主页"
+                  >
                     {{ reply.userName?.charAt(0) || '游' }}
                   </div>
                   <div class="reply-body">
                     <div class="reply-header">
-                      <span class="reply-user">{{ reply.userName || '匿名用户' }}</span>
+                      <span class="reply-user clickable" @click="goToUserProfile(reply.userId)">{{ reply.userName || '匿名用户' }}</span>
                       <span class="reply-time">{{ formatDate(reply.createdAt) }}</span>
                     </div>
                     <p class="reply-text">
@@ -395,6 +405,13 @@ function getAvatarColor(name?: string): string {
   ];
   const index = (name?.charCodeAt(0) || 0) % colors.length;
   return colors[index];
+}
+
+// 跳转到用户主页
+function goToUserProfile(userId: number) {
+  if (userId) {
+    router.push(`/user/${userId}`);
+  }
 }
 
 // 添加快捷标签
@@ -1203,6 +1220,29 @@ onMounted(() => {
   color: white;
   font-weight: 600;
   font-size: 18px;
+}
+
+.user-avatar.clickable,
+.reply-avatar.clickable {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.user-avatar.clickable:hover,
+.reply-avatar.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.user-name.clickable,
+.reply-user.clickable {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.user-name.clickable:hover,
+.reply-user.clickable:hover {
+  color: #667eea;
 }
 
 .user-info {

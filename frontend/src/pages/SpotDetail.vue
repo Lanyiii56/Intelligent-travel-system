@@ -164,13 +164,18 @@
           </div>
           <div v-else class="comments-list">
             <div v-for="c in sortedComments" :key="c.id" class="comment-item">
-              <div class="comment-avatar" :style="{ background: getAvatarColor(c.userName || c.userId) }">
+              <div 
+                class="comment-avatar clickable" 
+                :style="{ background: getAvatarColor(c.userName || c.userId) }"
+                @click="goToUserProfile(c.userId)"
+                title="查看用户主页"
+              >
                 {{ getAvatarText(c.userName) }}
               </div>
               <div class="comment-body">
                 <div class="comment-header">
                   <div class="comment-user-info">
-                    <span class="comment-author">{{ c.userName || '游客' + c.userId }}</span>
+                    <span class="comment-author clickable" @click="goToUserProfile(c.userId)">{{ c.userName || '游客' + c.userId }}</span>
                     <span class="comment-rating" v-if="c.rating">
                       <span v-for="i in 5" :key="i" class="mini-star">
                         {{ i <= c.rating ? '⭐' : '☆' }}
@@ -206,12 +211,17 @@
                   </button>
                   <div v-show="expandedReplies.has(c.id)" class="replies-list">
                     <div v-for="reply in c.replies" :key="reply.id" class="reply-item">
-                      <div class="reply-avatar" :style="{ background: getAvatarColor(reply.userName || reply.userId) }">
+                      <div 
+                        class="reply-avatar clickable" 
+                        :style="{ background: getAvatarColor(reply.userName || reply.userId) }"
+                        @click="goToUserProfile(reply.userId)"
+                        title="查看用户主页"
+                      >
                         {{ getAvatarText(reply.userName) }}
                       </div>
                       <div class="reply-body">
                         <div class="reply-header">
-                          <span class="reply-author">{{ reply.userName || '游客' + reply.userId }}</span>
+                          <span class="reply-author clickable" @click="goToUserProfile(reply.userId)">{{ reply.userName || '游客' + reply.userId }}</span>
                           <span class="reply-time">{{ formatTime(reply.createdAt) }}</span>
                         </div>
                         <p class="reply-content">
@@ -598,6 +608,13 @@ function formatTime(time: string) {
   if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`;
   
   return d.toLocaleDateString('zh-CN');
+}
+
+// 跳转到用户主页
+function goToUserProfile(userId: number) {
+  if (userId) {
+    router.push(`/user/${userId}`);
+  }
 }
 
 onMounted(load);
@@ -1106,6 +1123,29 @@ onMounted(load);
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
+}
+
+.comment-avatar.clickable,
+.reply-avatar.clickable {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.comment-avatar.clickable:hover,
+.reply-avatar.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.comment-author.clickable,
+.reply-author.clickable {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.comment-author.clickable:hover,
+.reply-author.clickable:hover {
+  color: #667eea;
 }
 
 .comment-body {

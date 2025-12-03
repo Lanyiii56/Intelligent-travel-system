@@ -26,6 +26,16 @@
         </div>
       </div>
       <div class="user-stats">
+        <div class="stat-item clickable" @click="showFollowList('following')">
+          <span class="stat-value">{{ followStats.following }}</span>
+          <span class="stat-label">关注</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item clickable" @click="showFollowList('followers')">
+          <span class="stat-value">{{ followStats.followers }}</span>
+          <span class="stat-label">粉丝</span>
+        </div>
+        <div class="stat-divider"></div>
         <div class="stat-item">
           <span class="stat-value">{{ favs.length }}</span>
           <span class="stat-label">收藏</span>
@@ -39,11 +49,6 @@
         <div class="stat-item">
           <span class="stat-value">{{ itineraries.length }}</span>
           <span class="stat-label">行程</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <span class="stat-value">{{ totalDistance }}</span>
-          <span class="stat-label">公里</span>
         </div>
       </div>
     </div>
@@ -70,6 +75,44 @@
       </div>
     </div>
     
+    <!-- 关注/粉丝列表弹窗 -->
+    <div class="follow-modal" v-if="showFollowModal" @click.self="closeFollowModal">
+      <div class="follow-modal-content">
+        <div class="follow-modal-header">
+          <h3>{{ followModalType === 'following' ? '我的关注' : '我的粉丝' }}</h3>
+          <button class="close-btn" @click="closeFollowModal">✕</button>
+        </div>
+        <div class="follow-list" v-if="followList.length > 0">
+          <div 
+            class="follow-item" 
+            v-for="item in followList" 
+            :key="item.userId"
+          >
+            <img 
+              :src="item.avatar || defaultAvatar" 
+              class="follow-avatar"
+              @click="goToUserProfile(item.userId)"
+            />
+            <div class="follow-info" @click="goToUserProfile(item.userId)">
+              <span class="follow-nickname">{{ item.nickname }}</span>
+              <span class="follow-motto" v-if="item.motto">{{ item.motto }}</span>
+            </div>
+            <button 
+              class="follow-action-btn"
+              @click="startChat(item.userId)"
+            >
+              💬 私信
+            </button>
+          </div>
+        </div>
+        <div class="empty-follow" v-else>
+          <div class="empty-icon">{{ followModalType === 'following' ? '👥' : '💝' }}</div>
+          <p>{{ followModalType === 'following' ? '还没有关注任何人' : '还没有粉丝' }}</p>
+          <span v-if="followModalType === 'following'">去发现有趣的用户吧</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 编辑资料弹窗 -->
     <el-dialog v-model="showEditProfile" title="编辑资料" width="400px">
       <el-form :model="editForm" label-width="80px">
@@ -244,6 +287,7 @@ import { getUserItineraries, deleteItinerary as deleteItineraryApi } from '@/api
 import { updateProfile as updateProfileApi } from '@/api/auth';
 import { useAuthStore } from '@/modules/auth/store';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import * as messageApi from '@/modules/message/api';
 
 // 组件名称，用于 keep-alive 缓存
 defineOptions({
@@ -260,6 +304,13 @@ const loading = ref(true);
 const showEditProfile = ref(false);
 const showSettings = ref(false);
 const showAvatarUpload = ref(false);
+
+// 社交相关状态
+const followStats = ref({ following: 0, followers: 0 });
+const showFollowModal = ref(false);
+const followModalType = ref<'following' | 'followers'>('following');
+const followList = ref<any[]>([]);
+const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png';
 
 // 用户座右铭
 const mottos = [
@@ -328,6 +379,9 @@ onMounted(async () => {
     const userId = authStore.user.id;
     const f = await favoriteList(userId);
     favs.value = f.data || [];
+    
+    // 加载关注统计
+    loadFollowStats();
     const o = await listOrders(userId);
     orders.value = o.data || [];
     
@@ -473,6 +527,57 @@ function getStatusText(status: string) {
     'CANCELLED': '已取消'
   };
   return map[status] || status;
+}
+
+// ==================== 社交相关方法 ====================
+
+// 加载关注统计
+async function loadFollowStats() {
+  if (!authStore.user?.id) return;
+  try {
+    const res = await messageApi.getFollowStats(authStore.user.id);
+    followStats.value = res.data || { following: 0, followers: 0 };
+  } catch (error) {
+    console.error('加载关注统计失败:', error);
+  }
+}
+
+// 显示关注/粉丝列表
+async function showFollowList(type: 'following' | 'followers') {
+  if (!authStore.user?.id) return;
+  followModalType.value = type;
+  showFollowModal.value = true;
+  
+  try {
+    if (type === 'following') {
+      const res = await messageApi.getFollowingList(authStore.user.id);
+      followList.value = res.data || [];
+    } else {
+      const res = await messageApi.getFollowersList(authStore.user.id);
+      followList.value = res.data || [];
+    }
+  } catch (error) {
+    console.error('加载关注列表失败:', error);
+    followList.value = [];
+  }
+}
+
+// 关闭关注列表弹窗
+function closeFollowModal() {
+  showFollowModal.value = false;
+  followList.value = [];
+}
+
+// 跳转到用户主页
+function goToUserProfile(userId: number) {
+  closeFollowModal();
+  router.push(`/user/${userId}`);
+}
+
+// 发起私信
+function startChat(userId: number) {
+  closeFollowModal();
+  router.push(`/chat/${userId}`);
 }
 </script>
 
@@ -1139,5 +1244,168 @@ function getStatusText(status: string) {
   .content-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 统计项可点击样式 */
+.stat-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: -8px -12px;
+}
+
+.stat-item.clickable:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.stat-item.clickable:hover .stat-value {
+  color: #667eea;
+}
+
+/* 关注列表弹窗 */
+.follow-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.follow-modal-content {
+  background: white;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 70vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.follow-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.follow-modal-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #eee;
+}
+
+.follow-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+.follow-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  transition: background 0.2s;
+}
+
+.follow-item:hover {
+  background: #fafafa;
+}
+
+.follow-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 12px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.follow-avatar:hover {
+  transform: scale(1.05);
+}
+
+.follow-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.follow-nickname {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  display: block;
+}
+
+.follow-motto {
+  font-size: 13px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.follow-action-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transition: all 0.3s;
+}
+
+.follow-action-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.empty-follow {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-follow .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-follow p {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.empty-follow span {
+  font-size: 14px;
+  color: #999;
 }
 </style>

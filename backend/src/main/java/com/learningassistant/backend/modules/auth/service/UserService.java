@@ -43,6 +43,16 @@ public class UserService {
     }
     
     /**
+     * 搜索用户
+     */
+    public java.util.List<User> searchUsers(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return userRepository.searchUsers(keyword.trim());
+    }
+    
+    /**
      * 更新用户资料
      */
     public User updateProfile(Long userId, String nickname, Integer age, String gender, String motto) {

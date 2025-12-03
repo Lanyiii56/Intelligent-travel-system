@@ -136,6 +136,16 @@ public class AuthController {
         return ResponseEntity.ok(new UserDetailInfo(user));
     }
     
+    // 搜索用户
+    @GetMapping("/users/search")
+    public ResponseEntity<?> searchUsers(@RequestParam String keyword) {
+        java.util.List<User> users = userService.searchUsers(keyword);
+        java.util.List<UserDetailInfo> result = users.stream()
+            .map(UserDetailInfo::new)
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+    
     // 更新头像
     @PutMapping("/avatar/{userId}")
     public ResponseEntity<?> updateAvatar(@PathVariable Long userId, @RequestBody UpdateAvatarRequest req) {

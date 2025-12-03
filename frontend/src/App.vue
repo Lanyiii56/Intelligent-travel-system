@@ -37,6 +37,10 @@
             <span class="nav-icon">✨</span>
             <span>推荐</span>
           </router-link>
+          <router-link to="/messages" class="nav-link">
+            <span class="nav-icon">💬</span>
+            <span>消息</span>
+          </router-link>
           <router-link to="/profile" class="nav-link">
             <span class="nav-icon">👤</span>
             <span>我的</span>
