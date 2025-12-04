@@ -9,8 +9,18 @@ import * as authApi from '../api';
 
 const TOKEN_KEY = 'travel_token';
 const USER_KEY = 'travel_user';
+const APP_VERSION_KEY = 'travel_app_version';
+const CURRENT_VERSION = '2.0.0'; // 更新版本号会清除旧登录状态
 
 export const useAuthStore = defineStore('auth', () => {
+  // 检查版本，如果版本不匹配则清除旧的登录状态
+  const savedVersion = localStorage.getItem(APP_VERSION_KEY);
+  if (savedVersion !== CURRENT_VERSION) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.setItem(APP_VERSION_KEY, CURRENT_VERSION);
+  }
+
   // ============ 状态 ============
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
   const user = ref<User | null>(

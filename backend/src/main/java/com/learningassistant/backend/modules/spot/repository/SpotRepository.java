@@ -10,7 +10,5 @@ import java.util.List;
  * 模块: spot (成员2)
  */
 public interface SpotRepository extends JpaRepository<Spot, Long> {
-    List<Spot> findByRegionId(Integer regionId);
-    List<Spot> findByAgeMinLessThanEqualAndAgeMaxGreaterThanEqual(int ageMin, int ageMax);
-    List<Spot> findByPlayTimeLessThanEqual(int minutes);
+    List<Spot> findByRegionId(Long regionId);
 }

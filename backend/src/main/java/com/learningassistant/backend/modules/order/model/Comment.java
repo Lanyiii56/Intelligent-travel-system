@@ -10,7 +10,7 @@ import java.util.List;
  * 模块: order (成员4)
  */
 @Entity
-@Table(name = "comments")
+@Table(name = "travel_comment")
 @Data
 public class Comment {
     @Id

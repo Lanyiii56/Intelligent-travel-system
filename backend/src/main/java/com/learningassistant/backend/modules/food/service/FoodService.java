@@ -6,6 +6,8 @@ import com.learningassistant.backend.modules.food.repository.FoodCommentReposito
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,28 +40,28 @@ public class FoodService {
     /**
      * 根据地区获取美食
      */
-    public List<Food> findByRegionId(Integer regionId) {
+    public List<Food> findByRegionId(Long regionId) {
         return foodRepository.findByRegionId(regionId);
     }
 
     /**
      * 根据地区获取美食（按评分排序）
      */
-    public List<Food> findByRegionIdOrderByRating(Integer regionId) {
+    public List<Food> findByRegionIdOrderByRating(Long regionId) {
         return foodRepository.findByRegionIdOrderByRating(regionId);
     }
 
     /**
      * 根据地区和类别获取美食
      */
-    public List<Food> findByRegionIdAndCategory(Integer regionId, String category) {
+    public List<Food> findByRegionIdAndCategory(Long regionId, String category) {
         return foodRepository.findByRegionIdAndCategory(regionId, category);
     }
 
     /**
      * 根据地区和价格上限获取美食
      */
-    public List<Food> findByRegionIdAndPriceMax(Integer regionId, Double maxPrice) {
+    public List<Food> findByRegionIdAndPriceMax(Long regionId, BigDecimal maxPrice) {
         return foodRepository.findByRegionIdAndPriceMax(regionId, maxPrice);
     }
 
@@ -69,9 +71,9 @@ public class FoodService {
      * @param budget 人均预算（可选）
      * @param count 推荐数量
      */
-    public List<Food> recommendForTrip(Integer regionId, Double budget, int count) {
+    public List<Food> recommendForTrip(Long regionId, BigDecimal budget, int count) {
         List<Food> foods;
-        if (budget != null && budget > 0) {
+        if (budget != null && budget.compareTo(BigDecimal.ZERO) > 0) {
             foods = foodRepository.findByRegionIdAndPriceMax(regionId, budget);
         } else {
             foods = foodRepository.findByRegionIdOrderByRating(regionId);
@@ -106,7 +108,7 @@ public class FoodService {
         if (food != null) {
             // 计算平均评分
             Double avgRating = foodCommentRepository.calculateAverageRating(foodId);
-            food.setRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0);
+            food.setRating(avgRating != null ? BigDecimal.valueOf(avgRating).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
             
             // 统计评论数量
             Long count = foodCommentRepository.countTopLevelComments(foodId);

@@ -27,19 +27,7 @@
           <label>📍 选择城市</label>
           <select v-model="filters.regionId" @change="loadHotels" class="city-select">
             <option :value="undefined">全部城市</option>
-            <optgroup 
-              v-for="province in groupedRegions" 
-              :key="province.id" 
-              :label="province.name"
-            >
-              <option 
-                v-for="city in province.cities" 
-                :key="city.id" 
-                :value="city.id"
-              >
-                {{ city.name }}
-              </option>
-            </optgroup>
+            <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
         </div>
         <div class="search-bar">
@@ -157,22 +145,6 @@ const filters = reactive<HotelSearchParams>({
   regionId: undefined,
   stars: undefined,
   sort: undefined
-});
-
-// 将地区按省份分组
-interface GroupedRegion {
-  id: number;
-  name: string;
-  cities: Region[];
-}
-
-const groupedRegions = computed<GroupedRegion[]>(() => {
-  const provinces = regions.value.filter(r => !r.parentId);
-  return provinces.map(province => ({
-    id: province.id,
-    name: province.name,
-    cities: regions.value.filter(r => r.parentId === province.id)
-  })).filter(p => p.cities.length > 0);
 });
 
 // 获取地区名称

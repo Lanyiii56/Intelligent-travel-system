@@ -12,6 +12,7 @@ import com.learningassistant.backend.modules.spot.repository.SpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -116,7 +117,7 @@ public class SmartRecommendService {
         
         // 只做基本筛选，让 AI 有更多选择空间
         return allSpots.stream()
-                .filter(spot -> spot.getPlayTime() != null && spot.getPlayTime() > 0)
+                .filter(spot -> spot.getRecommendedDuration() != null && spot.getRecommendedDuration() > 0)
                 .sorted(Comparator.comparing((Spot s) -> calculateSpotScore(s)).reversed())
                 .limit(10) // 最多给 AI 10 个景点选择
                 .collect(Collectors.toList());
@@ -133,11 +134,11 @@ public class SmartRecommendService {
             info.put("id", spot.getId());
             info.put("name", spot.getName());
             info.put("description", spot.getDescription() != null ? spot.getDescription() : "暂无介绍");
-            info.put("playTime", spot.getPlayTime() != null ? spot.getPlayTime() : 60);
-            info.put("priceMin", spot.getPriceMin() != null ? spot.getPriceMin() : 0);
-            info.put("priceMax", spot.getPriceMax() != null ? spot.getPriceMax() : 0);
-            info.put("latitude", spot.getLatitude() != null ? spot.getLatitude() : 0);
-            info.put("longitude", spot.getLongitude() != null ? spot.getLongitude() : 0);
+            info.put("playTime", spot.getRecommendedDuration() != null ? spot.getRecommendedDuration() : 60);
+            info.put("priceMin", spot.getTicketPrice() != null ? spot.getTicketPrice() : BigDecimal.ZERO);
+            info.put("priceMax", spot.getTicketPrice() != null ? spot.getTicketPrice() : BigDecimal.ZERO);
+            info.put("latitude", spot.getLatitude() != null ? spot.getLatitude() : BigDecimal.ZERO);
+            info.put("longitude", spot.getLongitude() != null ? spot.getLongitude() : BigDecimal.ZERO);
             spotInfoList.add(info);
         }
         
@@ -145,7 +146,7 @@ public class SmartRecommendService {
         String destination = "未知";
         if (!availableSpots.isEmpty() && availableSpots.get(0).getRegionId() != null) {
             Region region = regionRepository.findById(availableSpots.get(0).getRegionId()).orElse(null);
-            if (region != null) {
+            if (region != null && region.getName() != null) {
                 destination = region.getName();
             }
         }
@@ -237,7 +238,8 @@ public class SmartRecommendService {
             Spot spot = availableSpots.get(index - 1);
             
             // 检查时间限制
-            if (totalTime + spot.getPlayTime() > request.getPlayTime()) {
+            int playTime = spot.getRecommendedDuration() != null ? spot.getRecommendedDuration() : 60;
+            if (totalTime + playTime > request.getPlayTime()) {
                 break;
             }
             
@@ -246,11 +248,11 @@ public class SmartRecommendService {
             recommend.setName(spot.getName());
             recommend.setDescription(spot.getDescription());
             recommend.setImageUrl(spot.getImageUrl());
-            recommend.setPlayTime(spot.getPlayTime());
-            recommend.setPriceMin(spot.getPriceMin() != null ? spot.getPriceMin() : 0);
-            recommend.setPriceMax(spot.getPriceMax() != null ? spot.getPriceMax() : 0);
-            recommend.setLatitude(spot.getLatitude());
-            recommend.setLongitude(spot.getLongitude());
+            recommend.setPlayTime(playTime);
+            recommend.setPriceMin(spot.getTicketPrice() != null ? spot.getTicketPrice().doubleValue() : 0);
+            recommend.setPriceMax(spot.getTicketPrice() != null ? spot.getTicketPrice().doubleValue() : 0);
+            recommend.setLatitude(spot.getLatitude() != null ? spot.getLatitude().doubleValue() : null);
+            recommend.setLongitude(spot.getLongitude() != null ? spot.getLongitude().doubleValue() : null);
             recommend.setOrder(order++);
             
             // 设置 AI 生成的推荐理由
@@ -258,7 +260,7 @@ public class SmartRecommendService {
             recommend.setReason(reason != null ? reason : generateDefaultReason(spot, request.getAge()));
             
             result.add(recommend);
-            totalTime += spot.getPlayTime();
+            totalTime += playTime;
         }
         
         return result.isEmpty() ? null : result;
@@ -269,7 +271,7 @@ public class SmartRecommendService {
 
         return allSpots.stream()
                 .filter(spot -> isAgeSuitable(spot, request.getAge()))
-                .filter(spot -> spot.getPlayTime() != null && spot.getPlayTime() <= request.getPlayTime())
+                .filter(spot -> spot.getRecommendedDuration() != null && spot.getRecommendedDuration() <= request.getPlayTime())
                 .filter(spot -> isBudgetSuitable(spot, request.getBudget(), request.getPeopleCount()))
                 .filter(spot -> isPreferenceSuitable(spot, request.getPreference()))
                 .sorted(Comparator.comparing((Spot s) -> calculateSpotScore(s)).reversed())
@@ -277,15 +279,15 @@ public class SmartRecommendService {
     }
 
     private boolean isAgeSuitable(Spot spot, Integer age) {
-        if (spot.getAgeMin() == null || spot.getAgeMax() == null) return true;
-        return age >= spot.getAgeMin() && age <= spot.getAgeMax();
+        // 新表结构没有 ageMin/ageMax 字段，默认适合所有年龄
+        return true;
     }
 
     private boolean isBudgetSuitable(Spot spot, Double budget, Integer peopleCount) {
         if (budget == null || budget <= 0) return true;
-        if (spot.getPriceMax() == null) return true;
+        if (spot.getTicketPrice() == null) return true;
         double perPersonBudget = budget / peopleCount;
-        return spot.getPriceMax() <= perPersonBudget * 0.5;
+        return spot.getTicketPrice().doubleValue() <= perPersonBudget * 0.5;
     }
 
     private boolean isPreferenceSuitable(Spot spot, String preference) {
@@ -296,10 +298,10 @@ public class SmartRecommendService {
 
     private double calculateSpotScore(Spot spot) {
         double score = 50;
-        if (spot.getPriceMin() != null) {
-            score += Math.max(0, 20 - (spot.getPriceMin() / 50));
+        if (spot.getTicketPrice() != null) {
+            score += Math.max(0, 20 - (spot.getTicketPrice().doubleValue() / 50));
         }
-        if (spot.getPlayTime() != null && spot.getPlayTime() <= 120) {
+        if (spot.getRecommendedDuration() != null && spot.getRecommendedDuration() <= 120) {
             score += 10;
         }
         return score;
@@ -323,10 +325,10 @@ public class SmartRecommendService {
             }
         }
         
-        if (spot.getPlayTime() != null) {
-            if (spot.getPlayTime() <= 60) {
+        if (spot.getRecommendedDuration() != null) {
+            if (spot.getRecommendedDuration() <= 60) {
                 reason.append("游玩时间短，轻松愉快");
-            } else if (spot.getPlayTime() <= 120) {
+            } else if (spot.getRecommendedDuration() <= 120) {
                 reason.append("游玩时间适中，体验丰富");
             } else {
                 reason.append("可深度游玩，值得细细品味");
@@ -353,10 +355,10 @@ public class SmartRecommendService {
         List<Spot> sortedSpots = optimizeRouteOrder(spots);
 
         for (Spot spot : sortedSpots) {
-            if (spot.getPlayTime() == null) continue;
+            if (spot.getRecommendedDuration() == null) continue;
             
             // 根据年龄调整实际游玩时间
-            int adjustedPlayTime = (int) (spot.getPlayTime() * paceMultiplier);
+            int adjustedPlayTime = (int) (spot.getRecommendedDuration() * paceMultiplier);
             
             // 计算到下一个景点的交通时间
             int travelTime = result.isEmpty() ? 0 : calculateTravelTime(result.get(result.size() - 1), spot);
@@ -415,7 +417,8 @@ public class SmartRecommendService {
         }
         double distance = calculateDistance(
             from.getLatitude(), from.getLongitude(),
-            to.getLatitude(), to.getLongitude()
+            to.getLatitude() != null ? to.getLatitude().doubleValue() : null, 
+            to.getLongitude() != null ? to.getLongitude().doubleValue() : null
         );
         // 假设平均速度30km/h（考虑城市交通）
         return Math.max(15, (int) (distance / 30 * 60));
@@ -469,8 +472,10 @@ public class SmartRecommendService {
         
         for (Spot spot : candidates) {
             double distance = calculateDistance(
-                from.getLatitude(), from.getLongitude(),
-                spot.getLatitude(), spot.getLongitude()
+                from.getLatitude() != null ? from.getLatitude().doubleValue() : null, 
+                from.getLongitude() != null ? from.getLongitude().doubleValue() : null,
+                spot.getLatitude() != null ? spot.getLatitude().doubleValue() : null, 
+                spot.getLongitude() != null ? spot.getLongitude().doubleValue() : null
             );
             if (distance < minDistance) {
                 minDistance = distance;
@@ -503,11 +508,11 @@ public class SmartRecommendService {
         sr.setName(spot.getName());
         sr.setDescription(spot.getDescription());
         sr.setImageUrl(spot.getImageUrl());
-        sr.setPlayTime(spot.getPlayTime());
-        sr.setPriceMin(spot.getPriceMin());
-        sr.setPriceMax(spot.getPriceMax());
-        sr.setLatitude(spot.getLatitude());
-        sr.setLongitude(spot.getLongitude());
+        sr.setPlayTime(spot.getRecommendedDuration());
+        sr.setPriceMin(spot.getTicketPrice() != null ? spot.getTicketPrice().doubleValue() : null);
+        sr.setPriceMax(spot.getTicketPrice() != null ? spot.getTicketPrice().doubleValue() : null);
+        sr.setLatitude(spot.getLatitude() != null ? spot.getLatitude().doubleValue() : null);
+        sr.setLongitude(spot.getLongitude() != null ? spot.getLongitude().doubleValue() : null);
         sr.setOrder(order);
         return sr;
     }
@@ -520,7 +525,7 @@ public class SmartRecommendService {
         else if (age < 60) reason.append("休闲放松好去处，");
         else reason.append("适合老年人慢游，");
 
-        if (spot.getPlayTime() != null && spot.getPlayTime() <= 60) reason.append("游玩时间适中");
+        if (spot.getRecommendedDuration() != null && spot.getRecommendedDuration() <= 60) reason.append("游玩时间适中");
         else reason.append("内容丰富值得深度游");
         return reason.toString();
     }

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -22,11 +23,11 @@ public class HotelController {
 
     @GetMapping
     public ResponseEntity<?> getAllHotels(
-            @RequestParam(required = false) Integer regionId,
+            @RequestParam(required = false) Long regionId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer stars,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) String sort
     ) {
         List<Hotel> hotels;

@@ -7,9 +7,10 @@ import java.time.LocalDateTime;
 /**
  * 用户实体
  * 模块: auth (成员1)
+ * 映射到 TravelAdmin 的 travel_user 表
  */
 @Entity
-@Table(name = "users")
+@Table(name = "travel_user")
 @Data
 public class User {
     @Id
@@ -39,6 +40,9 @@ public class User {
     // 用户等级
     @Column(length = 50)
     private String level = "萌新旅者";
+
+    @Column(columnDefinition = "CHAR(1) DEFAULT '0'")
+    private String status = "0";
 
     @Column(name = "create_time")
     private LocalDateTime createTime = LocalDateTime.now();

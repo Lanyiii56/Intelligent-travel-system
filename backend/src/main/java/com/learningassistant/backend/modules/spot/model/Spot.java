@@ -2,13 +2,16 @@ package com.learningassistant.backend.modules.spot.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 景点实体
  * 模块: spot (成员2)
+ * 映射到 TravelAdmin 的 travel_spot 表
  */
 @Entity
-@Table(name = "spots")
+@Table(name = "travel_spot")
 @Data
 public class Spot {
     @Id
@@ -20,28 +23,40 @@ public class Spot {
     @Column(columnDefinition = "text")
     private String description;
 
-    private Integer regionId;
+    @Column(name = "region_id")
+    private Long regionId;
 
-    private Double priceMin;
-    private Double priceMax;
+    private String address;
 
+    @Column(name = "ticket_price")
+    private BigDecimal ticketPrice;
+
+    @Column(name = "open_time")
     private String openTime;
-    private Integer playTime; // 游玩时长(分钟)
 
-    private Integer ageMin;
-    private Integer ageMax;
+    @Column(name = "close_time")
+    private String closeTime;
 
-    private Double latitude;
-    private Double longitude;
+    @Column(name = "recommended_duration")
+    private Integer recommendedDuration; // 游玩时长(分钟)
 
-    @Column(columnDefinition = "text")
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+
+    @Column(name = "image_url", columnDefinition = "text")
     private String imageUrl;
-    
-    // 评分（根据用户评论动态计算）
-    @Column(columnDefinition = "DOUBLE PRECISION DEFAULT 0")
-    private Double rating = 0.0;
-    
-    // 评论数量
-    @Column(columnDefinition = "INTEGER DEFAULT 0")
+
+    private String tags;
+
+    @Column(columnDefinition = "DECIMAL(3,2) DEFAULT 0")
+    private BigDecimal rating;
+
+    @Column(name = "comment_count", columnDefinition = "INTEGER DEFAULT 0")
     private Integer commentCount = 0;
+
+    @Column(columnDefinition = "CHAR(1) DEFAULT '0'")
+    private String status = "0";
+
+    @Column(name = "create_time")
+    private LocalDateTime createTime;
 }

@@ -142,7 +142,12 @@ async function create() {
   submitting.value = true;
   try {
     const amount = Number((spot.value.priceMin || 0) * count.value);
-    const res = await createOrder(1, spotId, amount);
+    const res = await createOrder({
+      userId: 1,  // TODO: 从登录状态获取
+      spotId: spotId,
+      amount: amount,
+      visitorCount: count.value
+    });
     orderId.value = res.data.id;
     showSuccess.value = true;
   } catch (e) {

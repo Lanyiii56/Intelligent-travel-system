@@ -11,7 +11,7 @@ import lombok.Data;
 public class RecommendRequest {
 
     @NotNull(message = "地区ID不能为空")
-    private Integer regionId;
+    private Long regionId;
 
     @NotNull(message = "年龄不能为空")
     @Min(value = 1, message = "年龄必须大于0")

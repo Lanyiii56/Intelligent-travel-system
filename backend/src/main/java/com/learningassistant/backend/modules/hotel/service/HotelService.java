@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class HotelService {
         return hotelRepository.findById(id);
     }
 
-    public List<Hotel> getHotelsByRegion(Integer regionId) {
+    public List<Hotel> getHotelsByRegion(Long regionId) {
         return hotelRepository.findByRegionId(regionId);
     }
 
@@ -45,19 +46,19 @@ public class HotelService {
         return hotelRepository.searchByKeyword(keyword);
     }
 
-    public List<Hotel> getHotelsByRegionAndPriceRange(Integer regionId, Double minPrice, Double maxPrice) {
+    public List<Hotel> getHotelsByRegionAndPriceRange(Long regionId, BigDecimal minPrice, BigDecimal maxPrice) {
         return hotelRepository.findByRegionAndPriceRange(regionId, minPrice, maxPrice);
     }
 
-    public List<Hotel> getHotelsByRegionAndStars(Integer regionId, Integer stars) {
+    public List<Hotel> getHotelsByRegionAndStars(Long regionId, Integer stars) {
         return hotelRepository.findByRegionIdAndStars(regionId, stars);
     }
     
-    public List<Hotel> getHotelsByRegionAndStarsOrderByPrice(Integer regionId, Integer stars) {
+    public List<Hotel> getHotelsByRegionAndStarsOrderByPrice(Long regionId, Integer stars) {
         return hotelRepository.findByRegionIdAndStarsOrderByPriceMinAsc(regionId, stars);
     }
     
-    public List<Hotel> getHotelsByRegionAndStarsOrderByRating(Integer regionId, Integer stars) {
+    public List<Hotel> getHotelsByRegionAndStarsOrderByRating(Long regionId, Integer stars) {
         return hotelRepository.findByRegionIdAndStarsOrderByRatingDesc(regionId, stars);
     }
     
@@ -73,11 +74,11 @@ public class HotelService {
         return hotelRepository.findByStarsOrderByRatingDesc(stars);
     }
 
-    public List<Hotel> getHotelsByRegionOrderByRating(Integer regionId) {
+    public List<Hotel> getHotelsByRegionOrderByRating(Long regionId) {
         return hotelRepository.findByRegionIdOrderByRatingDesc(regionId);
     }
 
-    public List<Hotel> getHotelsByRegionOrderByPrice(Integer regionId) {
+    public List<Hotel> getHotelsByRegionOrderByPrice(Long regionId) {
         return hotelRepository.findByRegionIdOrderByPriceMinAsc(regionId);
     }
     
@@ -101,10 +102,10 @@ public class HotelService {
         double lngDelta = radiusKm / (111.0 * Math.cos(Math.toRadians(latitude)));
         
         return hotelRepository.findNearby(
-            latitude - latDelta,
-            latitude + latDelta,
-            longitude - lngDelta,
-            longitude + lngDelta
+            BigDecimal.valueOf(latitude - latDelta),
+            BigDecimal.valueOf(latitude + latDelta),
+            BigDecimal.valueOf(longitude - lngDelta),
+            BigDecimal.valueOf(longitude + lngDelta)
         );
     }
 

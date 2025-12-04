@@ -5,6 +5,8 @@ import com.learningassistant.backend.modules.order.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,24 +20,43 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    public OrderEntity createOrder(Long userId, Long spotId, Double amount) {
+    public OrderEntity createOrder(Long userId, Long spotId, BigDecimal amount, 
+                                   LocalDate visitDate, Integer visitorCount,
+                                   String contactName, String contactPhone) {
         OrderEntity order = new OrderEntity();
         order.setUserId(userId);
         order.setSpotId(spotId);
         order.setAmount(amount);
-        order.setOrderStatus("pending");
+        order.setOrderStatus("PENDING");
+        order.setVisitDate(visitDate);
+        order.setVisitorCount(visitorCount != null ? visitorCount : 1);
+        order.setContactName(contactName);
+        order.setContactPhone(contactPhone);
+        order.setCreatedAt(LocalDateTime.now());
         return orderRepository.save(order);
     }
 
     public OrderEntity payOrder(Long orderId) {
         OrderEntity order = orderRepository.findById(orderId).orElse(null);
         if (order == null) return null;
-        order.setOrderStatus("paid");
-        order.setPayTime(LocalDateTime.now());
+        order.setOrderStatus("PAID");
+        order.setUpdatedAt(LocalDateTime.now());
+        return orderRepository.save(order);
+    }
+    
+    public OrderEntity cancelOrder(Long orderId) {
+        OrderEntity order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) return null;
+        order.setOrderStatus("CANCELLED");
+        order.setUpdatedAt(LocalDateTime.now());
         return orderRepository.save(order);
     }
 
     public List<OrderEntity> listByUser(Long userId) {
         return orderRepository.findByUserId(userId);
+    }
+    
+    public OrderEntity getById(Long orderId) {
+        return orderRepository.findById(orderId).orElse(null);
     }
 }

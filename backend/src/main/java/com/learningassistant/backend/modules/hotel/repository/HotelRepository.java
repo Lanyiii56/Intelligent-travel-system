@@ -5,11 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface HotelRepository extends JpaRepository<Hotel, Long> {
     
-    List<Hotel> findByRegionId(Integer regionId);
+    List<Hotel> findByRegionId(Long regionId);
     
     // 按名称模糊搜索
     @Query("SELECT h FROM Hotel h WHERE h.name LIKE %:keyword% OR h.address LIKE %:keyword%")
@@ -18,13 +19,13 @@ public interface HotelRepository extends JpaRepository<Hotel, Long> {
     // 按区域和价格范围查询
     @Query("SELECT h FROM Hotel h WHERE h.regionId = :regionId AND h.priceMin >= :minPrice AND h.priceMax <= :maxPrice")
     List<Hotel> findByRegionAndPriceRange(
-        @Param("regionId") Integer regionId,
-        @Param("minPrice") Double minPrice,
-        @Param("maxPrice") Double maxPrice
+        @Param("regionId") Long regionId,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice
     );
     
     // 按星级查询
-    List<Hotel> findByRegionIdAndStars(Integer regionId, Integer stars);
+    List<Hotel> findByRegionIdAndStars(Long regionId, Integer stars);
     
     // 按星级查询（不限地区）
     List<Hotel> findByStars(Integer stars);
@@ -36,16 +37,16 @@ public interface HotelRepository extends JpaRepository<Hotel, Long> {
     List<Hotel> findByStarsOrderByRatingDesc(Integer stars);
     
     // 按地区和星级查询并按价格排序
-    List<Hotel> findByRegionIdAndStarsOrderByPriceMinAsc(Integer regionId, Integer stars);
+    List<Hotel> findByRegionIdAndStarsOrderByPriceMinAsc(Long regionId, Integer stars);
     
     // 按地区和星级查询并按评分排序
-    List<Hotel> findByRegionIdAndStarsOrderByRatingDesc(Integer regionId, Integer stars);
+    List<Hotel> findByRegionIdAndStarsOrderByRatingDesc(Long regionId, Integer stars);
     
     // 按评分排序
-    List<Hotel> findByRegionIdOrderByRatingDesc(Integer regionId);
+    List<Hotel> findByRegionIdOrderByRatingDesc(Long regionId);
     
     // 按价格排序
-    List<Hotel> findByRegionIdOrderByPriceMinAsc(Integer regionId);
+    List<Hotel> findByRegionIdOrderByPriceMinAsc(Long regionId);
     
     // 全部酒店按价格排序
     List<Hotel> findAllByOrderByPriceMinAsc();
@@ -58,9 +59,9 @@ public interface HotelRepository extends JpaRepository<Hotel, Long> {
            "h.latitude BETWEEN :minLat AND :maxLat AND " +
            "h.longitude BETWEEN :minLng AND :maxLng")
     List<Hotel> findNearby(
-        @Param("minLat") Double minLat,
-        @Param("maxLat") Double maxLat,
-        @Param("minLng") Double minLng,
-        @Param("maxLng") Double maxLng
+        @Param("minLat") BigDecimal minLat,
+        @Param("maxLat") BigDecimal maxLat,
+        @Param("minLng") BigDecimal minLng,
+        @Param("maxLng") BigDecimal maxLng
     );
 }

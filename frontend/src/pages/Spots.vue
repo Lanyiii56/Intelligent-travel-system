@@ -34,45 +34,26 @@
         <div class="filter-row">
           <div class="filter-group region-filter">
             <label class="filter-label">目的地</label>
-            <el-cascader
-              v-model="selectedRegion"
-              :options="regionOptions"
-              :props="{ value: 'id', label: 'name', children: 'cities', emitPath: false }"
-              placeholder="选择地区"
-              clearable
-              filterable
-              @change="onSearch"
-            />
+            <select v-model="selectedRegion" @change="onSearch" class="region-select">
+              <option :value="null">全部地区</option>
+              <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+            </select>
           </div>
           <div class="filter-group">
-            <label class="filter-label">年龄</label>
+            <label class="filter-label">游玩时长</label>
             <div class="input-with-suffix">
-              <input type="number" v-model.number="age" min="1" max="100" />
-              <span class="suffix">岁</span>
-            </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">可用时间</label>
-            <div class="input-with-suffix">
-              <input type="number" v-model.number="time" min="30" step="30" />
-              <span class="suffix">分钟</span>
+              <input type="number" v-model.number="time" min="30" step="30" placeholder="不限" />
+              <span class="suffix">分钟内</span>
             </div>
           </div>
         </div>
         <!-- 价格筛选 -->
         <div class="filter-row">
           <div class="filter-group">
-            <label class="filter-label">最低价格</label>
-            <div class="input-with-suffix">
-              <input type="number" v-model.number="minPrice" min="0" placeholder="不限" />
-              <span class="suffix">元</span>
-            </div>
-          </div>
-          <div class="filter-group">
             <label class="filter-label">最高价格</label>
             <div class="input-with-suffix">
               <input type="number" v-model.number="maxPrice" min="0" placeholder="不限" />
-              <span class="suffix">元</span>
+              <span class="suffix">元以内</span>
             </div>
           </div>
           <div class="filter-actions">
@@ -131,7 +112,7 @@
           <div class="spot-image">
             <img v-if="s.imageUrl" :src="s.imageUrl" :alt="s.name" />
             <div v-else class="spot-placeholder">🏞️</div>
-            <div class="spot-badge" v-if="s.priceMin">¥{{ s.priceMin }}起</div>
+            <div class="spot-badge" v-if="s.ticketPrice">¥{{ s.ticketPrice }}起</div>
             <div class="spot-rating" v-if="s.rating">
               <span>⭐</span> {{ s.rating?.toFixed(1) || '4.5' }}
             </div>
@@ -142,8 +123,8 @@
               <span>📍</span> {{ s.regionName }}
             </div>
             <div class="spot-tags">
-              <span class="tag">⏱️ {{ s.playTime }}分钟</span>
-              <span class="tag">👥 {{ s.ageMin }}-{{ s.ageMax }}岁</span>
+              <span class="tag" v-if="s.recommendedDuration">⏱️ {{ s.recommendedDuration }}分钟</span>
+              <span class="tag" v-if="s.tags">🏷️ {{ s.tags }}</span>
             </div>
             <p class="spot-desc" v-if="s.description">
               {{ s.description.replace(/<[^>]*>/g, '').slice(0, 60) }}...
@@ -152,7 +133,7 @@
           <div class="spot-footer">
             <div class="spot-price">
               <span class="price-label">门票</span>
-              <span class="price-value">¥{{ s.priceMin }}-{{ s.priceMax }}</span>
+              <span class="price-value">¥{{ s.ticketPrice || '免费' }}</span>
             </div>
             <span class="view-detail">查看详情 →</span>
           </div>
@@ -194,9 +175,7 @@ const showFilter = ref(true);
 // 搜索条件
 const searchKeyword = ref('');
 const selectedRegion = ref<number | null>(null);
-const age = ref<number | undefined>(undefined);
 const time = ref<number | undefined>(undefined);
-const minPrice = ref<number | undefined>(undefined);
 const maxPrice = ref<number | undefined>(undefined);
 const sortBy = ref('default');
 
@@ -208,16 +187,6 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value));
 
 // 地区数据
 const regions = ref<any[]>([]);
-const regionOptions = computed(() => {
-  return regions.value.map(province => ({
-    id: province.id,
-    name: province.name,
-    cities: province.cities?.map((city: any) => ({
-      id: city.id,
-      name: city.name
-    })) || []
-  }));
-});
 
 // 加载地区数据
 async function loadRegions() {
@@ -240,9 +209,7 @@ async function onSearch() {
     
     if (searchKeyword.value) params.keyword = searchKeyword.value;
     if (selectedRegion.value) params.regionId = selectedRegion.value;
-    if (age.value) params.age = age.value;
     if (time.value) params.time = time.value;
-    if (minPrice.value !== undefined) params.minPrice = minPrice.value;
     if (maxPrice.value !== undefined) params.maxPrice = maxPrice.value;
     
     const res = await searchSpots(params);
@@ -251,9 +218,9 @@ async function onSearch() {
     
     // 前端排序
     if (sortBy.value === 'price') {
-      spots.value.sort((a, b) => a.priceMin - b.priceMin);
+      spots.value.sort((a, b) => (a.ticketPrice || 0) - (b.ticketPrice || 0));
     } else if (sortBy.value === 'time') {
-      spots.value.sort((a, b) => a.playTime - b.playTime);
+      spots.value.sort((a, b) => (a.recommendedDuration || 0) - (b.recommendedDuration || 0));
     }
   } catch (e) {
     console.error('搜索失败', e);
@@ -278,24 +245,18 @@ async function loadAll() {
     if (selectedRegion.value) {
       data = data.filter((s: any) => s.regionId === selectedRegion.value);
     }
-    if (age.value) {
-      data = data.filter((s: any) => age.value! >= s.ageMin && age.value! <= s.ageMax);
-    }
     if (time.value) {
-      data = data.filter((s: any) => s.playTime <= time.value!);
-    }
-    if (minPrice.value !== undefined) {
-      data = data.filter((s: any) => s.priceMin >= minPrice.value!);
+      data = data.filter((s: any) => s.recommendedDuration && s.recommendedDuration <= time.value!);
     }
     if (maxPrice.value !== undefined) {
-      data = data.filter((s: any) => s.priceMax <= maxPrice.value!);
+      data = data.filter((s: any) => s.ticketPrice !== null && s.ticketPrice <= maxPrice.value!);
     }
     
     // 排序
     if (sortBy.value === 'price') {
-      data.sort((a: any, b: any) => a.priceMin - b.priceMin);
+      data.sort((a: any, b: any) => (a.ticketPrice || 0) - (b.ticketPrice || 0));
     } else if (sortBy.value === 'time') {
-      data.sort((a: any, b: any) => a.playTime - b.playTime);
+      data.sort((a: any, b: any) => (a.recommendedDuration || 0) - (b.recommendedDuration || 0));
     }
     
     totalCount.value = data.length;
@@ -314,9 +275,7 @@ async function loadAll() {
 function resetFilter() {
   searchKeyword.value = '';
   selectedRegion.value = null;
-  age.value = undefined;
   time.value = undefined;
-  minPrice.value = undefined;
   maxPrice.value = undefined;
   sortBy.value = 'default';
   currentPage.value = 1;
@@ -484,8 +443,20 @@ onMounted(() => {
   min-width: 200px;
 }
 
-.region-filter :deep(.el-cascader) {
+.region-select {
   width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.region-select:focus {
+  outline: none;
+  border-color: #667eea;
 }
 
 .filter-label {

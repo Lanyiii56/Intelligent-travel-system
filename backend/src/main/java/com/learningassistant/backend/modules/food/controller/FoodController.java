@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -45,7 +46,7 @@ public class FoodController {
      * 根据地区获取美食列表
      */
     @GetMapping("/region/{regionId}")
-    public ResponseEntity<List<Food>> getByRegion(@PathVariable Integer regionId) {
+    public ResponseEntity<List<Food>> getByRegion(@PathVariable Long regionId) {
         return ResponseEntity.ok(foodService.findByRegionIdOrderByRating(regionId));
     }
 
@@ -54,7 +55,7 @@ public class FoodController {
      */
     @GetMapping("/region/{regionId}/category/{category}")
     public ResponseEntity<List<Food>> getByRegionAndCategory(
-            @PathVariable Integer regionId,
+            @PathVariable Long regionId,
             @PathVariable String category) {
         return ResponseEntity.ok(foodService.findByRegionIdAndCategory(regionId, category));
     }
@@ -64,8 +65,8 @@ public class FoodController {
      */
     @GetMapping("/recommend")
     public ResponseEntity<List<Food>> recommendForTrip(
-            @RequestParam Integer regionId,
-            @RequestParam(required = false) Double budget,
+            @RequestParam Long regionId,
+            @RequestParam(required = false) BigDecimal budget,
             @RequestParam(defaultValue = "3") Integer count) {
         return ResponseEntity.ok(foodService.recommendForTrip(regionId, budget, count));
     }

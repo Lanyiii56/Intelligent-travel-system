@@ -9,6 +9,8 @@ import com.learningassistant.backend.modules.spot.repository.SpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -66,7 +68,7 @@ public class SocialService {
         if (spot != null) {
             // 计算平均评分
             Double avgRating = commentRepository.calculateAverageRating(spotId);
-            spot.setRating(avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0);
+            spot.setRating(avgRating != null ? BigDecimal.valueOf(avgRating).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
             
             // 统计评论数量
             Long count = commentRepository.countBySpotIdAndParentIdIsNull(spotId);

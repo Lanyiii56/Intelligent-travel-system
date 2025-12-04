@@ -45,31 +45,18 @@
               <label>目的地</label>
               <el-select 
                 v-model="form.regionId" 
-                placeholder="输入城市名搜索，如：宜宾、四川" 
+                placeholder="输入城市名搜索" 
                 size="large"
                 filterable
                 :filter-method="filterRegions"
                 @visible-change="onSelectVisibleChange"
               >
-                <el-option-group
-                  v-for="province in filteredRegions"
-                  :key="province.id"
-                  :label="province.name"
-                >
-                  <!-- 如果省份没有子城市，直接显示省份本身 -->
-                  <el-option
-                    v-if="province.cities.length === 0"
-                    :label="province.name"
-                    :value="province.id"
-                  />
-                  <!-- 显示子城市 -->
-                  <el-option
-                    v-for="city in province.cities"
-                    :key="city.id"
-                    :label="city.name"
-                    :value="city.id"
-                  />
-                </el-option-group>
+                <el-option
+                  v-for="region in filteredRegions"
+                  :key="region.id"
+                  :label="region.name"
+                  :value="region.id"
+                />
               </el-select>
             </div>
 
@@ -312,6 +299,35 @@
         <div class="map-container">
           <div id="route-map" class="route-map"></div>
         </div>
+        
+        <!-- 各交通方式时间对比卡片 -->
+        <div class="transport-compare-section" v-if="result.spots.length > 1">
+          <div class="transport-compare-title">🚗 各交通方式预计时间</div>
+          <div class="transport-compare-grid">
+            <div class="transport-compare-card" style="--card-color: #ef4444">
+              <div class="compare-icon">🚗</div>
+              <div class="compare-label">驾车</div>
+              <div class="compare-time">{{ calculateTotalDriveTime() }}分钟</div>
+            </div>
+            <div class="transport-compare-card" style="--card-color: #3b82f6">
+              <div class="compare-icon">🚌</div>
+              <div class="compare-label">公交</div>
+              <div class="compare-time">{{ calculateTotalBusTime() }}分钟</div>
+            </div>
+            <div class="transport-compare-card" style="--card-color: #8b5cf6">
+              <div class="compare-icon">🚇</div>
+              <div class="compare-label">地铁</div>
+              <div class="compare-time">{{ calculateTotalSubwayTime() }}分钟</div>
+            </div>
+            <div class="transport-compare-card" style="--card-color: #10b981">
+              <div class="compare-icon">🚶</div>
+              <div class="compare-label">步行</div>
+              <div class="compare-time">{{ calculateTotalWalkTime() }}分钟</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 景点图例 -->
         <div class="map-legend">
           <div class="legend-item" v-for="(spot, index) in result.spots" :key="spot.id">
             <span class="legend-number">{{ index + 1 }}</span>
@@ -366,28 +382,7 @@
         </div>
       </div>
 
-      <!-- 地图 -->
-      <div class="map-panel" v-if="result.spots.length > 0">
-        <h3 class="panel-title">
-          路线地图
-          <span class="ai-route-badge" v-if="result.aiPowered">🤖 AI 路线规划</span>
-        </h3>
-        <div class="map-legend" v-if="result.transportation && result.transportation.length > 0">
-          <span class="legend-item" v-for="(t, i) in result.transportation" :key="i">
-            <span class="legend-dot" :style="{ background: getTransportColor(t.method) }"></span>
-            {{ getTransportIcon(t.method) }} {{ t.method }}
-          </span>
-        </div>
-        <div class="map-wrapper">
-          <TravelMap 
-            :spots="result.spots" 
-            :route-info="result.route"
-            :transportation="result.transportation"
-            :ai-powered="result.aiPowered"
-          />
-        </div>
       </div>
-    </div>
 
     <!-- 空状态 -->
     <div v-else-if="hasSearched && !loading" class="empty-section">
@@ -415,7 +410,6 @@ import { ElMessage } from 'element-plus';
 import { smartRecommend, saveItinerary, getUserItineraries, type SmartRecommendResponse } from '@/api/recommend';
 import { getAllRegions, type Region } from '@/api/region';
 import { recommendFoods, type Food } from '@/api/food';
-import TravelMap from '@/components/TravelMap.vue';
 import { useAuthStore } from '@/modules/auth/store';
 import { AMAP_CONFIG } from '@/config/amap';
 
@@ -460,66 +454,16 @@ const displaySummary = computed(() => {
   return result.value.summary.replace('🤖 AI智能推荐：', '').replace('【AI智能推荐】', '');
 });
 
-// 将地区按省份分组
-interface GroupedRegion {
-  id: number;
-  name: string;
-  cities: Region[];
-}
-
 // 搜索关键词
 const searchKeyword = ref('');
 
-const groupedRegions = computed<GroupedRegion[]>(() => {
-  // 获取所有省份（parentId 为空）
-  const provinces = regions.value.filter(r => !r.parentId);
-  
-  return provinces.map(province => ({
-    id: province.id,
-    name: province.name,
-    cities: regions.value.filter(r => r.parentId === province.id)
-  }));
-});
-
-// 过滤后的地区列表
-const filteredRegions = computed<GroupedRegion[]>(() => {
+// 过滤后的地区列表（扁平结构）
+const filteredRegions = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase();
-  
-  // 如果没有搜索关键词，返回所有地区
   if (!keyword) {
-    return groupedRegions.value;
+    return regions.value;
   }
-  
-  const result: GroupedRegion[] = [];
-  
-  for (const province of groupedRegions.value) {
-    // 检查省份名是否匹配
-    const provinceMatch = province.name.toLowerCase().includes(keyword);
-    
-    // 过滤匹配的城市
-    const matchedCities = province.cities.filter(city => 
-      city.name.toLowerCase().includes(keyword)
-    );
-    
-    // 如果省份匹配，显示该省份下所有城市
-    if (provinceMatch) {
-      result.push({
-        id: province.id,
-        name: province.name,
-        cities: province.cities
-      });
-    } 
-    // 如果有匹配的城市，只显示匹配的城市
-    else if (matchedCities.length > 0) {
-      result.push({
-        id: province.id,
-        name: province.name,
-        cities: matchedCities
-      });
-    }
-  }
-  
-  return result;
+  return regions.value.filter(r => r.name.toLowerCase().includes(keyword));
 });
 
 // 搜索过滤方法
@@ -759,18 +703,60 @@ function createRouteMap(spots: any[]) {
     routeMap.add(marker);
   });
   
-  // 绘制路线连接线
+  // 获取交通信息
+  const transportation = result.value?.transportation || [];
+  
+  // 绘制路线连接线（分段绘制，根据交通方式显示不同颜色）
   if (spots.length > 1) {
-    const path = spots.map(s => [s.longitude, s.latitude]);
-    const polyline = new window.AMap.Polyline({
-      path: path,
-      strokeColor: '#667eea',
-      strokeWeight: 4,
-      strokeOpacity: 0.8,
-      strokeStyle: 'solid',
-      lineJoin: 'round'
-    });
-    routeMap.add(polyline);
+    for (let i = 0; i < spots.length - 1; i++) {
+      const from = spots[i];
+      const to = spots[i + 1];
+      const transport = transportation[i];
+      
+      // 根据交通方式选择颜色
+      const color = transport ? getTransportColor(transport.method) : '#667eea';
+      
+      // 绘制路线段
+      const polyline = new window.AMap.Polyline({
+        path: [[from.longitude, from.latitude], [to.longitude, to.latitude]],
+        strokeColor: color,
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+        strokeStyle: 'solid',
+        lineJoin: 'round'
+      });
+      routeMap.add(polyline);
+      
+      // 在路线中点添加交通信息标签
+      if (transport) {
+        const midLng = (from.longitude + to.longitude) / 2;
+        const midLat = (from.latitude + to.latitude) / 2;
+        
+        const icon = getTransportIcon(transport.method);
+        const labelContent = `
+          <div style="
+            background: white;
+            border: 2px solid ${color};
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            white-space: nowrap;
+          ">
+            ${icon} ${transport.method} ${transport.duration}分钟
+          </div>
+        `;
+        
+        const labelMarker = new window.AMap.Marker({
+          position: [midLng, midLat],
+          content: labelContent,
+          offset: new window.AMap.Pixel(-40, -15),
+          zIndex: 100
+        });
+        routeMap.add(labelMarker);
+      }
+    }
   }
   
   // 自动调整视野
@@ -795,6 +781,70 @@ function getTransportIcon(method: string): string {
     '自驾': '🚗'
   };
   return icons[method] || '🚶';
+}
+
+// 计算总距离（公里）
+function calculateTotalDistance(): number {
+  if (!result.value?.spots || result.value.spots.length < 2) return 0;
+  let total = 0;
+  const spots = result.value.spots;
+  for (let i = 0; i < spots.length - 1; i++) {
+    const from = spots[i];
+    const to = spots[i + 1];
+    if (from.latitude && from.longitude && to.latitude && to.longitude) {
+      // 简单距离计算（直线距离 * 1.3 估算实际路程）
+      const lat1 = Number(from.latitude);
+      const lng1 = Number(from.longitude);
+      const lat2 = Number(to.latitude);
+      const lng2 = Number(to.longitude);
+      const R = 6371; // 地球半径（公里）
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      total += R * c * 1.3; // 乘以1.3估算实际路程
+    }
+  }
+  return Math.round(total * 10) / 10;
+}
+
+// 计算驾车时间（考虑市区堵车、红绿灯等因素）
+function calculateTotalDriveTime(): number {
+  const distance = calculateTotalDistance();
+  const segments = (result.value?.spots?.length || 1) - 1;
+  
+  // 基础时速：市区平均25km/h（考虑堵车）
+  const baseTime = distance / 25 * 60;
+  
+  // 每个景点间加5-10分钟（停车、找路、红绿灯等）
+  const extraTime = segments * 8;
+  
+  // 高峰期系数（假设1.2倍）
+  const peakFactor = 1.2;
+  
+  return Math.round((baseTime + extraTime) * peakFactor);
+}
+
+// 计算公交时间（假设平均时速20km/h，含等车换乘）
+function calculateTotalBusTime(): number {
+  const distance = calculateTotalDistance();
+  const segments = (result.value?.spots?.length || 1) - 1;
+  return Math.round(distance / 20 * 60 + segments * 10); // 每段加10分钟等车
+}
+
+// 计算地铁时间（假设平均时速35km/h，含换乘）
+function calculateTotalSubwayTime(): number {
+  const distance = calculateTotalDistance();
+  const segments = (result.value?.spots?.length || 1) - 1;
+  return Math.round(distance / 35 * 60 + segments * 8); // 每段加8分钟换乘
+}
+
+// 计算步行时间（假设步行速度5km/h）
+function calculateTotalWalkTime(): number {
+  const distance = calculateTotalDistance();
+  return Math.round(distance / 5 * 60);
 }
 
 // 获取交通方式颜色（与地图保持一致）
@@ -876,27 +926,34 @@ async function onSaveItinerary() {
   // 检查是否已收藏相同行程
   try {
     const existingRes = await getUserItineraries(userId);
-    const existingItineraries = existingRes.data || [];
+    console.log('获取已保存行程响应:', existingRes);
+    const existingItineraries = existingRes.data || existingRes || [];
+    console.log('已保存行程列表:', existingItineraries);
     
-    // 比较景点ID列表是否相同
-    const currentSpotIds = result.value.spots.map(s => s.id).sort().join(',');
-    
-    for (const existing of existingItineraries) {
-      try {
-        const existingData = JSON.parse(existing.itineraryData || '{}');
-        const existingSpotIds = (existingData.spots || []).map((s: any) => s.id).sort().join(',');
-        
-        if (currentSpotIds === existingSpotIds) {
-          ElMessage.warning('该行程已收藏过，无需重复收藏');
-          return;
+    if (Array.isArray(existingItineraries) && existingItineraries.length > 0) {
+      // 比较景点ID列表是否相同
+      const currentSpotIds = result.value.spots.map(s => s.id).sort((a, b) => a - b).join(',');
+      console.log('当前行程景点IDs:', currentSpotIds);
+      
+      for (const existing of existingItineraries) {
+        try {
+          const existingData = JSON.parse(existing.itineraryData || '{}');
+          // 数据结构是 { formData, result }，spots 在 result 里面
+          const spots = existingData.result?.spots || existingData.spots || [];
+          const existingSpotIds = spots.map((s: any) => s.id).sort((a: number, b: number) => a - b).join(',');
+          console.log('已保存行程景点IDs:', existingSpotIds, '行程名:', existing.name);
+          
+          if (currentSpotIds === existingSpotIds) {
+            ElMessage.warning('该行程已收藏过，无需重复收藏');
+            return;
+          }
+        } catch (e) {
+          console.log('解析已保存行程失败:', e);
         }
-      } catch (e) {
-        // 解析失败，继续检查下一个
       }
     }
   } catch (e) {
-    // 获取已有行程失败，继续保存
-    console.log('检查重复失败，继续保存');
+    console.log('检查重复失败，继续保存:', e);
   }
   
   // 保存到数据库
@@ -1896,11 +1953,69 @@ function goToFoodDetail(foodId: number) {
   border: 1px solid rgba(124, 58, 237, 0.2);
 }
 
+/* 交通方式对比卡片 */
+.transport-compare-section {
+  margin: 20px 0;
+}
+
+.transport-compare-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 16px;
+}
+
+.transport-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.transport-compare-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 2px solid transparent;
+  border-top: 4px solid var(--card-color);
+  transition: all 0.3s ease;
+}
+
+.transport-compare-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--card-color);
+}
+
+.compare-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.compare-label {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.compare-time {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--card-color);
+}
+
+@media (max-width: 768px) {
+  .transport-compare-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .map-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-top: 16px;
   padding: 12px 16px;
   background: #f9fafb;
   border-radius: 10px;

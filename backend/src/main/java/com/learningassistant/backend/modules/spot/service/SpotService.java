@@ -25,14 +25,7 @@ public class SpotService {
         return spotRepository.findById(id).orElse(null);
     }
 
-    public List<Spot> findByRegion(int regionId) {
+    public List<Spot> findByRegion(Long regionId) {
         return spotRepository.findByRegionId(regionId);
-    }
-
-    public List<Spot> findSuitableSpots(int age, int timeLimit) {
-        return spotRepository.findAll().stream()
-                .filter(s -> age >= s.getAgeMin() && age <= s.getAgeMax())
-                .filter(s -> s.getPlayTime() <= timeLimit)
-                .toList();
     }
 }

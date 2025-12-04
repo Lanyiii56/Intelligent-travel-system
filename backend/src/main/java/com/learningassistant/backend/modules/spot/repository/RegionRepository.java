@@ -9,8 +9,6 @@ import java.util.List;
  * 地区数据访问
  * 模块: spot (成员2)
  */
-public interface RegionRepository extends JpaRepository<Region, Integer> {
-    List<Region> findByParentId(Integer parentId);
-    List<Region> findByType(String type);
-    List<Region> findByParentIdIsNull();
+public interface RegionRepository extends JpaRepository<Region, Long> {
+    // 新表结构没有 parentId 和 type 字段
 }

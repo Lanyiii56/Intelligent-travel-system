@@ -31,8 +31,8 @@ public class RecommendService {
 
         List<Spot> filtered = all.stream()
                 .filter(s -> isAgeSuitable(s, age))
-                .filter(s -> s.getPlayTime() != null && s.getPlayTime() <= timeLimit)
-                .sorted(Comparator.comparing(Spot::getPlayTime))
+                .filter(s -> s.getRecommendedDuration() != null && s.getRecommendedDuration() <= timeLimit)
+                .sorted(Comparator.comparing(Spot::getRecommendedDuration))
                 .limit(10)
                 .toList();
 
@@ -92,9 +92,7 @@ public class RecommendService {
      * 检查年龄是否适合
      */
     private boolean isAgeSuitable(Spot spot, Integer age) {
-        if (spot.getAgeMin() == null || spot.getAgeMax() == null) {
-            return true;
-        }
-        return age >= spot.getAgeMin() && age <= spot.getAgeMax();
+        // 新表结构没有 ageMin/ageMax 字段，默认适合所有年龄
+        return true;
     }
 }
